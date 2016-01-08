@@ -53,6 +53,15 @@ Remove-Item *.o
 Write-Host ""
 
 # ==============================================================================
+Write-Host "Compiling C++ source files..." -ForegroundColor Cyan
+# disabled --includedir and --cflags
+Write-Host "  Reading: '$LLVM_CONFIG --cxxflags'" -ForegroundColor Gray
+$LLVM_CONFIG_RESULT = & $LLVM_CONFIG --cxxflags
+
+Write-Host "  Command: '$LLVM_CLANGPP -c $LLVM_CONFIG_RESULT -o llvm-cbindings.o $GHDL_SRC\ortho\llvm\llvm-cbindings.cpp'" -ForegroundColor Gray
+& $LLVM_CLANGPP -c $LLVM_CONFIG_RESULT -o llvm-cbindings.o $GHDL_SRC\ortho\llvm\llvm-cbindings.cpp
+
+# ==============================================================================
 Write-Host "Compiling source files..." -ForegroundColor Cyan
 $COMPILE_OPTIONS = ("-c", "-gnaty3befhkmr", "-gnatwae", "-gnatf", "-gnat05", "-g", "-gnata")
 $COMPILE_INC_PATHS = (
@@ -170,7 +179,7 @@ $COMPILE_FILES = (
 	"vhdl/iirs_walk.adb"
 )
 
-Write-Host "  Command: '$GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_SRC/<File>.adb'" -ForegroundColor Cyan
+Write-Host "  Command: '$GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- <File>'" -ForegroundColor Cyan
 foreach ($File in $COMPILE_FILES)
 {	Write-Host "  $GHDL_SRC/$File" -ForegroundColor Gray
 	& $GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_SRC/$File
@@ -192,16 +201,6 @@ $BIND_INC_PATHS = (
 
 Write-Host "  Command: '$GNAT_BINDER $BIND_INC_PATHS $BIND_OPTIONS ortho_code_main.ali'" -ForegroundColor Gray
 & $GNAT_BINDER $BIND_INC_PATHS $BIND_OPTIONS ortho_code_main.ali
-
-# ==============================================================================
-Write-Host "Compiling C++ source files..." -ForegroundColor Cyan
-# disabled --includedir and --cflags
-Write-Host "  Reading: '$LLVM_CONFIG --cxxflags'" -ForegroundColor Gray
-$LLVM_CONFIG_RESULT = & $LLVM_CONFIG --cxxflags
-
-Write-Host "  Command: '$LLVM_CLANGPP -c $LLVM_CONFIG_RESULT -o llvm-cbindings.o $GHDL_SRC\ortho\llvm\llvm-cbindings.cpp'" -ForegroundColor Gray
-& $LLVM_CLANGPP -c $LLVM_CONFIG_RESULT -o llvm-cbindings.o $GHDL_SRC\ortho\llvm\llvm-cbindings.cpp
-
 
 # ==============================================================================
 Write-Host "Linking object files..." -ForegroundColor Cyan
@@ -338,23 +337,20 @@ $COMPILE_INC_PATHS = (
 )
 
 $COMPILE_FILES = (
-	"ghdldrv/ghdl_llvm.adb",
-	"ghdldrv/ghdldrv.adb",
-	"ghdldrv/ghdllocal.adb",
-	"ghdldrv/ghdlmain.adb",
-	"ghdldrv/ghdlprint.adb"
+	"$GHDL_ROOT/dist/llvm/windows/windows_default_path.ads",
+	"$GHDL_ROOT/dist/llvm/windows/default_pathes.ads",
+	"$GHDL_SRC/ghdldrv/ghdl_llvm.adb",
+	"$GHDL_SRC/ghdldrv/ghdl_llvm.adb",
+	"$GHDL_SRC/ghdldrv/ghdldrv.adb",
+	"$GHDL_SRC/ghdldrv/ghdllocal.adb",
+	"$GHDL_SRC/ghdldrv/ghdlmain.adb",
+	"$GHDL_SRC/ghdldrv/ghdlprint.adb"
 )
 
-Write-Host "  Command: '$GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_ROOT/dist/llvm/<File>.adb'" -ForegroundColor Cyan
-Write-Host "  $GHDL_ROOT/dist/llvm/windows/windows_default_path.ads" -ForegroundColor Yellow
-& $GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_ROOT/dist/llvm/windows/windows_default_path.ads
-Write-Host "  $GHDL_ROOT/dist/llvm/windows/default_pathes.ads" -ForegroundColor Yellow
-& $GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_ROOT/dist/llvm/windows/default_pathes.ads
-
-Write-Host "  Command: '$GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_SRC/<File>.adb'" -ForegroundColor Cyan
+Write-Host "  Command: '$GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- <File>'" -ForegroundColor Cyan
 foreach ($File in $COMPILE_FILES)
-{	Write-Host "  $GHDL_SRC/$File" -ForegroundColor Yellow
-	& $GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_SRC/$File
+{	Write-Host "  $File" -ForegroundColor Yellow
+	& $GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $File
 }
 
 
@@ -368,9 +364,36 @@ Write-Host "Linking object files..." -ForegroundColor Cyan
 Write-Host "  Command: '$GNAT_LINKER ghdl_llvm.ali -g'" -ForegroundColor Gray
 & $GNAT_LINKER ghdl_llvm.ali -g
 
+
 # ==============================================================================
 Write-Host "Compiling source files..." -ForegroundColor Cyan
-$COMPILE_OPTIONS = ("-c", "-gnat05", "-g", "-gnatec./src/grt/grt.adc")
+Write-Host "  $GHDL_SRC\src\grt\config\jumps.c" -ForegroundColor Yellow
+& $GCC_GCC -c -g -o jump.o "$GHDL_SRC\grt\config\jumps.c"
+Write-Host "  $GHDL_SRC\grt\config\times.c" -ForegroundColor Yellow
+& $GCC_GCC -c -g -o times.o "$GHDL_SRC\grt\config\times.c"
+Write-Host "  $GHDL_SRC\grt\grt-cbinding.c" -ForegroundColor Yellow
+& $GCC_GCC -c -g -o grt-cbinding.o "$GHDL_SRC\grt\grt-cbinding.c"
+Write-Host "  $GHDL_SRC\grt\grt-cvpi.c" -ForegroundColor Yellow
+& $GCC_GCC -c -g -o grt-cvpi.o "$GHDL_SRC\grt\grt-cvpi.c"
+Write-Host "  src\grt\fst\fstapi.c" -ForegroundColor Yellow
+& $GCC_GCC -c -g -o fstapi.o "-I$GHDL_SRC\grt\fst src\grt\fst\fstapi.c"
+Write-Host "  $GHDL_SRC\grt\fst\lz4.c" -ForegroundColor Yellow
+& $GCC_GCC -c -g -o lz4.o "$GHDL_SRC\grt\fst\lz4.c"
+Write-Host "  $GHDL_SRC\grt\fst\fastlz.c" -ForegroundColor Yellow
+& $GCC_GCC -c -g -o fastlz.o "$GHDL_SRC\grt\fst\fastlz.c"
+
+# gnatmake -c -aI./src/grt -gnatec./src/grt/grt.adc -gnat05 \
+  # ghdl_main  -cargs -g
+
+
+
+
+
+
+
+# ==============================================================================
+Write-Host "Compiling source files..." -ForegroundColor Cyan
+$COMPILE_OPTIONS = ("-c", "-gnat05", "-g", "-gnatec$GHDL_SRC/grt/grt.adc")
 $COMPILE_INC_PATHS = (
 	"-I$GHDL_ROOT/",
 	"-I$GHDL_SRC/grt"
@@ -412,8 +435,8 @@ foreach ($File in $COMPILE_FILES)
 	& $GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_SRC/$File
 }
 
-Write-Host "  grt-backtraces-impl.ads" -ForegroundColor Yellow
-& $GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS grt-backtraces-impl.ads
+Write-Host "  $GHDL_ROOT/dist/llvm/windows/grt-backtraces-impl.ads" -ForegroundColor Yellow
+& $GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS $GHDL_ROOT/dist/llvm/windows/grt-backtraces-impl.ads
 
 $COMPILE_FILES = (
 	"grt/grt-callbacks.adb",
@@ -444,8 +467,21 @@ $COMPILE_FILES = (
 
 foreach ($File in $COMPILE_FILES)
 {	Write-Host "  $GHDL_SRC/$File" -ForegroundColor Yellow
-	gcc.exe $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_SRC/$File
+	& $GCC_GCC $COMPILE_OPTIONS $COMPILE_INC_PATHS -I- $GHDL_SRC/$File
 }
+
+# ==============================================================================
+Write-Host "Binding source files..." -ForegroundColor Cyan
+Write-Host "  Command: '$GNAT_BINDER -Lgrt_ -o run-bind.adb -n ghdl_main.ali'" -ForegroundColor Gray
+& $GNAT_BINDER -Lgrt_ -o run-bind.adb -n ghdl_main.ali
+
+# ==============================================================================
+Write-Host "Compiling source files..." -ForegroundColor Cyan
+Write-Host "  $GCC_GCC -c -g -gnatec$GHDL_SRC/grt/grt.adc -gnat05 -o run-bind.o run-bind.adb" -ForegroundColor Gray
+& $GCC_GCC -c -g -gnatec$GHDL_SRC/grt/grt.adc -gnat05 -o run-bind.o run-bind.adb
+Write-Host "  $GCC_GCC -c -g -gnatec$GHDL_SRC/grt/grt.adc -gnat05 -o main.o $GHDL_SRC/grt/main.adb" -ForegroundColor Gray
+& $GCC_GCC -c -g -gnatec$GHDL_SRC/grt/grt.adc -gnat05 -o main.o $GHDL_SRC/grt/main.adb
+
 
 
 # restore Path
