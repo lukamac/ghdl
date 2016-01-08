@@ -57,9 +57,26 @@ Write-Host "Compiling C++ source files..." -ForegroundColor Cyan
 # disabled --includedir and --cflags
 Write-Host "  Reading: '$LLVM_CONFIG --cxxflags'" -ForegroundColor Gray
 $LLVM_CONFIG_RESULT = & $LLVM_CONFIG --cxxflags
+# $LLVM_CONFIG_RESULT = $LLVM_CONFIG_RESULT.Replace("3.5/", "3.5\")
+# $LLVM_CONFIG_RESULT = $LLVM_CONFIG_RESULT.Replace("-w", "/w")
 
-Write-Host "  Command: '$LLVM_CLANGPP -c $LLVM_CONFIG_RESULT -o llvm-cbindings.o $GHDL_SRC\ortho\llvm\llvm-cbindings.cpp'" -ForegroundColor Gray
-& $LLVM_CLANGPP -c $LLVM_CONFIG_RESULT -o llvm-cbindings.o $GHDL_SRC\ortho\llvm\llvm-cbindings.cpp
+# Write-Host $LLVM_CONFIG_RESULT -ForegroundColor Green
+
+# $params = @("-c", "-v")
+# foreach ($part in $LLVM_CONFIG_RESULT.Split(" "))
+# {	#if ($part.Length -ne 0)
+	#{	
+	# $params += $part
+	#}
+# }
+# $params += ("-o", "llvm-cbindings.o", "$GHDL_SRC\ortho\llvm\llvm-cbindings.cpp")
+
+# Write-Host $params -ForegroundColor Green
+
+$params = "-c -IC:\Tools\LLVM-3.5\include -DWIN32 -D_WINDOWS -W3 -MP -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -D_HAS_EXCEPTIONS=0 -o llvm-cbindings.o $GHDL_SRC\ortho\llvm\llvm-cbindings.cpp"
+
+Write-Host "  Command: '$LLVM_CLANGPP $params'" -ForegroundColor Gray
+& $LLVM_CLANGPP $params.Split(" ")
 
 # ==============================================================================
 Write-Host "Compiling source files..." -ForegroundColor Cyan
