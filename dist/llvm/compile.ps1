@@ -75,6 +75,11 @@ $LLVM_CONFIG_RESULT = & $LLVM_CONFIG --cxxflags
 
 $params = "-c -IC:\Tools\LLVM-3.5\include -DWIN32 -D_WINDOWS -W3 -MP -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -D_HAS_EXCEPTIONS=0 -o llvm-cbindings.o $GHDL_SRC\ortho\llvm\llvm-cbindings.cpp"
 
+Write-Host "  [WARNING] " -NoNewline -ForegroundColor Yellow
+Write-Host "Disabled exception handling: -D_HAS_EXCEPTIONS=0"
+Write-Host "  see: http://stackoverflow.com/questions/24197773/c-program-not-compiling-with-clang-and-visual-studio-2010-express"
+Write-Host "  see: http://clang.llvm.org/docs/MSVCCompatibility.html"
+
 Write-Host "  Command: '$LLVM_CLANGPP $params'" -ForegroundColor Gray
 & $LLVM_CLANGPP $params.Split(" ")
 
