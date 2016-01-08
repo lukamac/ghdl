@@ -77,8 +77,8 @@ $params = "-c -IC:\Tools\LLVM-3.5\include -DWIN32 -D_WINDOWS -W3 -MP -D_CRT_SECU
 
 Write-Host "  [WARNING] " -NoNewline -ForegroundColor Yellow
 Write-Host "Disabled exception handling: -D_HAS_EXCEPTIONS=0"
-Write-Host "  see: http://stackoverflow.com/questions/24197773/c-program-not-compiling-with-clang-and-visual-studio-2010-express"
-Write-Host "  see: http://clang.llvm.org/docs/MSVCCompatibility.html"
+Write-Host "    see: http://stackoverflow.com/questions/24197773/c-program-not-compiling-with-clang-and-visual-studio-2010-express"
+Write-Host "    see: http://clang.llvm.org/docs/MSVCCompatibility.html"
 
 Write-Host "  Command: '$LLVM_CLANGPP $params'" -ForegroundColor Gray
 & $LLVM_CLANGPP $params.Split(" ")
@@ -221,8 +221,12 @@ $BIND_INC_PATHS = (
 	"-aI$GHDL_SRC/ortho/llvm"
 )
 
-Write-Host "  Command: '$GNAT_BINDER $BIND_INC_PATHS $BIND_OPTIONS ortho_code_main.ali'" -ForegroundColor Gray
-& $GNAT_BINDER $BIND_INC_PATHS $BIND_OPTIONS ortho_code_main.ali
+$GNAT_BINDER_PARAMETERS =		$BIND_OPTIONS
+$GNAT_BINDER_PARAMETERS +=	$BIND_INC_PATHS
+$GNAT_BINDER_PARAMETERS +=	("ortho_code_main.ali")
+
+Write-Host "  Command: '$GNAT_BINDER $GNAT_BINDER_PARAMETERS'" -ForegroundColor Gray
+& $GNAT_BINDER $GNAT_BINDER_PARAMETERS
 
 # ==============================================================================
 Write-Host "Linking object files..." -ForegroundColor Cyan
@@ -339,8 +343,11 @@ $LINKER_LIBS = (
 	"-lm"
 )
 
-Write-Host "  Command: '$GNAT_LINKER ortho_code_main.ali -o ghdl1-llvm -g llvm-cbindings.o --LINK=clang++ -L$LLVM_ROOT/lib $LINKER_LIBS'" -ForegroundColor Gray
-& $GNAT_LINKER ortho_code_main.ali -o ghdl1-llvm -g llvm-cbindings.o --LINK=clang++ -L$LLVM_ROOT/lib $LINKER_LIBS
+$GNAT_LINKER_PARAMETERS =		@("-v", "ortho_code_main.ali", "-o", "ghdl1-llvm", "-g", "llvm-cbindings.o", "--LINK=clang++", ("-L" + $LLVM_ROOT + "/lib")
+$GNAT_LINKER_PARAMETERS +=	$LINKER_LIBS
+
+Write-Host "  Command: '$GNAT_LINKER $GNAT_LINKER_PARAMETERS'" -ForegroundColor Gray
+& $GNAT_LINKER $GNAT_LINKER_PARAMETERS
 
 
 # ==============================================================================
