@@ -3,7 +3,7 @@
 # kate: tab-width 2; replace-tabs off; indent-width 2;
 # 
 # ==============================================================================
-#	Authors:						Patrick Lehmann	(ported batch file to PowerShell)
+#	Authors:						Patrick Lehmann
 # 
 #	PowerShell Script:	Self-extracting (ZIP) installer for GHDL for Windows
 # 
