@@ -223,7 +223,7 @@ package body Sem_Stmts is
      (Stmt : Iir; Target : Iir; Staticness : Iir_Staticness);
 
    -- Semantic associed with signal mode.
-   -- See §4.3.3
+   -- See LRM93 4.3.3 (or LRM08 6.5.2)
    type Boolean_Array_Of_Iir_Mode is array (Iir_Mode) of Boolean;
    Iir_Mode_Readable : constant Boolean_Array_Of_Iir_Mode :=
      (Iir_Unknown_Mode => False,
@@ -239,6 +239,22 @@ package body Sem_Stmts is
       Iir_Inout_Mode => True,
       Iir_Buffer_Mode => True,
       Iir_Linkage_Mode => False);
+
+   --  Return True iff signal interface INTER is readable.
+   function Is_Interface_Signal_Readable (Inter : Iir) return Boolean
+   is
+      pragma Assert (Get_Kind (Inter) = Iir_Kind_Interface_Signal_Declaration);
+      Mode : constant Iir_Mode := Get_Mode (Inter);
+   begin
+      if Mode = Iir_Out_Mode and then Flags.Vhdl_Std >= Vhdl_08 then
+         --  LRM08 6.5.2 Interface object declarations
+         --  OUT.  The value of the inerface object is allowed [...] and
+         --  provided it is not a signal parameter, read.
+         return not Is_Parameter (Inter);
+      else
+         return Iir_Mode_Readable (Mode);
+      end if;
+   end Is_Interface_Signal_Readable;
 
    procedure Check_Aggregate_Target
      (Stmt : Iir; Target : Iir; Nbr : in out Natural)
@@ -336,8 +352,7 @@ package body Sem_Stmts is
       --   associated with the formal.
       --  GHDL: parent of target cannot be a function.
       if Targ_Obj_Kind = Iir_Kind_Interface_Signal_Declaration
-        and then
-        Get_Kind (Get_Parent (Target_Prefix)) = Iir_Kind_Procedure_Declaration
+        and then Is_Parameter (Target_Prefix)
       then
          Guarded_Target := Unknown;
       else
@@ -605,7 +620,8 @@ package body Sem_Stmts is
                   "null transactions can be assigned only to guarded signals");
             end if;
          else
-            if not Eval_Is_In_Bound (Expr, Targ_Type)
+            if Is_Valid (Get_Type (Expr))
+              and then not Eval_Is_In_Bound (Expr, Targ_Type)
               and then Get_Kind (Expr) /= Iir_Kind_Overflow_Literal
             then
                Warning_Msg_Sem
@@ -1132,7 +1148,7 @@ package body Sem_Stmts is
                  | Iir_Kinds_Signal_Attribute =>
                   null;
                when Iir_Kind_Interface_Signal_Declaration =>
-                  if not Iir_Mode_Readable (Get_Mode (Prefix)) then
+                  if not Is_Interface_Signal_Readable (Prefix) then
                      Error_Msg_Sem
                        (+El,
                         "%n of mode out can't be in a sensivity list", +Res);
@@ -2139,8 +2155,7 @@ package body Sem_Stmts is
 
          --  Within a subprogram.
          if Get_Kind (Sig_Object) = Iir_Kind_Signal_Declaration
-           or else (Get_Kind (Get_Parent (Sig_Object))
-                    /= Iir_Kind_Procedure_Declaration)
+           or else not Is_Parameter (Sig_Object)
          then
             Error_Msg_Sem (+Stmt, "%n is not a formal parameter", +Sig_Object);
          end if;
