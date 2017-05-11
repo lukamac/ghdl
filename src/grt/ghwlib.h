@@ -332,6 +332,8 @@ struct ghw_handler
 
   /* Non-composite (or basic) signals.  */
   int nbr_sigs;
+  char *skip_sigs;
+  int flag_full_names;
   struct ghw_sig *sigs;
 
   /* Hierarchy.  */
@@ -357,6 +359,8 @@ const char *ghw_get_hie_name (struct ghw_hie *h);
 void ghw_disp_hie (struct ghw_handler *h, struct ghw_hie *top);
 
 int ghw_read_base (struct ghw_handler *h);
+
+void ghw_filter_signals (struct ghw_handler *h, int *signals_to_keep, int nb_signals_to_keep);
 
 void ghw_disp_values (struct ghw_handler *h);
 

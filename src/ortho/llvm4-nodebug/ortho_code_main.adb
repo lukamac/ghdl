@@ -32,7 +32,7 @@ with Ortho_LLVM; use Ortho_LLVM;
 with Interfaces;
 with Interfaces.C; use Interfaces.C;
 
-procedure Ortho_Code_Main35 is
+procedure Ortho_Code_Main is
    --  Name of the output filename (given by option '-o').
    Output : String_Acc := null;
 
@@ -199,9 +199,8 @@ begin
    Target_Machine := CreateTargetMachine
      (Target, Triple, CPU, Features, Optimization, Reloc, CodeModelDefault);
 
-   Target_Data := GetTargetMachineData (Target_Machine);
-
-   SetDataLayout (Module, CopyStringRepOfTargetData (Target_Data));
+   Target_Data := CreateTargetDataLayout (Target_Machine);
+   SetModuleDataLayout (Module, Target_Data);
 
    Ortho_LLVM.Init;
 
@@ -261,7 +260,6 @@ begin
             Pass_Manager := CreateFunctionPassManagerForModule (Module);
          end if;
 
-         LLVM.Target.AddTargetData (Target_Data, Pass_Manager);
          AddPromoteMemoryToRegisterPass (Pass_Manager);
          AddCFGSimplificationPass (Pass_Manager);
 
@@ -317,4 +315,4 @@ exception
    when others =>
       Set_Exit_Status (2);
       raise;
-end Ortho_Code_Main35;
+end Ortho_Code_Main;

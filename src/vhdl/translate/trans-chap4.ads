@@ -51,8 +51,10 @@ package Trans.Chap4 is
 
    --  Elaborate In/Out_Conversion for ASSOC (signals only).
    --  NDEST is the data structure to be registered.
-   procedure Elab_In_Conversion (Assoc : Iir; Inter : Iir; Ndest : out Mnode);
-   procedure Elab_Out_Conversion (Assoc : Iir; Inter : Iir; Ndest : out Mnode);
+   procedure Elab_In_Conversion
+     (Assoc : Iir; Formal : Iir; Ndest : out Mnode);
+   procedure Elab_Out_Conversion
+     (Assoc : Iir; Formal : Iir; Ndest : out Mnode);
 
    --  Create code to elaborate declarations.
    --  NEED_FINAL is set when at least one declaration needs to be
@@ -98,7 +100,8 @@ package Trans.Chap4 is
    function Get_Scalar_Initial_Value (Atype : Iir) return O_Enode;
 
    --  Initialize NAME/OBJ with VALUE.
-   procedure Elab_Object_Init (Name : Mnode; Obj : Iir; Value : Iir);
+   procedure Elab_Object_Init
+     (Name : Mnode; Obj : Iir; Value : Iir; Alloc_Kind : Allocation_Kind);
 
    --  Get the ortho type for an object of type TINFO.
    function Get_Object_Type (Tinfo : Type_Info_Acc; Kind : Object_Kind_Type)
