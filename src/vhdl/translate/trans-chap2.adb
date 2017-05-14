@@ -322,11 +322,11 @@ package body Trans.Chap2 is
             Inter := Get_Chain (Inter);
          end loop;
       end if;
-      Finish_Subprogram_Decl (Interface_List, Info.Ortho_Func);
+      Finish_Subprogram_Decl (Interface_List, Info.Subprg_Node);
 
       --  Call the hook for foreign subprograms.
       if Is_Foreign and then Foreign_Hook /= null then
-         Foreign_Hook.all (Spec, Foreign, Info.Ortho_Func);
+         Foreign_Hook.all (Spec, Foreign, Info.Subprg_Node);
       end if;
 
       Save_Local_Identifier (Info.Subprg_Local_Id);
@@ -539,7 +539,7 @@ package body Trans.Chap2 is
 
       --  Create the body
 
-      Start_Subprogram_Body (Info.Ortho_Func);
+      Start_Subprogram_Body (Info.Subprg_Node);
 
       Start_Subprg_Instance_Use (Spec);
 
@@ -807,7 +807,8 @@ package body Trans.Chap2 is
                                  Info.Package_Body_Scope'Access);
          end if;
 
-         --  Each subprogram has a body instance argument.
+         --  Each subprogram has a body instance argument (because subprogram
+         --  bodys can access to body declarations).
          Subprgs.Push_Subprg_Instance
            (Info.Package_Body_Scope'Access, Info.Package_Body_Ptr_Type,
             Wki_Instance, Prev_Subprg_Instance);
@@ -1203,7 +1204,7 @@ package body Trans.Chap2 is
             Dest.all :=
               (Kind => Kind_Subprg,
                Use_Stack2 => Src.Use_Stack2,
-               Ortho_Func => Src.Ortho_Func,
+               Subprg_Node => Src.Subprg_Node,
                Res_Interface => Src.Res_Interface,
                Subprg_Params_Var => Instantiate_Var (Src.Subprg_Params_Var),
                Subprg_Params_Type => Src.Subprg_Params_Type,
@@ -1218,6 +1219,15 @@ package body Trans.Chap2 is
                Subprg_Local_Id => Src.Subprg_Local_Id,
                Subprg_Exit => Src.Subprg_Exit,
                Subprg_Result => Src.Subprg_Result);
+         when Kind_Operator =>
+            Dest.all :=
+              (Kind => Kind_Operator,
+               Operator_Stack2 => Src.Operator_Stack2,
+               Operator_Node => Src.Operator_Node,
+               Operator_Instance => Instantiate_Subprg_Instance
+                 (Src.Operator_Instance),
+               Operator_Left => Src.Operator_Left,
+               Operator_Right => Src.Operator_Right);
          when Kind_Interface =>
             Dest.all := (Kind => Kind_Interface,
                          Interface_Mechanism => Src.Interface_Mechanism,
@@ -1238,6 +1248,31 @@ package body Trans.Chap2 is
                  Src.Package_Instance_Elab_Subprg,
                Package_Instance_Spec_Scope => Src.Package_Instance_Spec_Scope,
                Package_Instance_Body_Scope => Src.Package_Instance_Body_Scope);
+
+         when Kind_Field =>
+            Dest.all := (Kind => Kind_Field,
+                         Field_Node => Src.Field_Node,
+                         Field_Bound => Src.Field_Bound);
+
+         when Kind_Package =>
+            Dest.all :=
+              (Kind => Kind_Package,
+               Package_Elab_Spec_Subprg => Src.Package_Elab_Spec_Subprg,
+               Package_Elab_Body_Subprg => Src.Package_Elab_Body_Subprg,
+               Package_Elab_Spec_Instance =>
+                 Instantiate_Subprg_Instance (Src.Package_Elab_Spec_Instance),
+               Package_Elab_Body_Instance =>
+                 Instantiate_Subprg_Instance (Src.Package_Elab_Body_Instance),
+               Package_Elab_Var => Instantiate_Var (Src.Package_Elab_Var),
+               Package_Rti_Const => Src.Package_Rti_Const,
+               Package_Spec_Scope =>
+                 Instantiate_Var_Scope (Src.Package_Spec_Scope),
+               Package_Spec_Ptr_Type => Src.Package_Spec_Ptr_Type,
+               Package_Body_Scope =>
+                 Instantiate_Var_Scope (Src.Package_Body_Scope),
+               Package_Body_Ptr_Type => Src.Package_Body_Ptr_Type,
+               Package_Spec_Field => Src.Package_Spec_Field,
+               Package_Local_Id => Src.Package_Local_Id);
 
          when others =>
             raise Internal_Error;

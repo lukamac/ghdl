@@ -40,6 +40,23 @@ package body Trans.Chap7 is
    use Trans.Helpers;
    procedure Copy_Range (Dest : Mnode; Src : Mnode);
 
+   procedure Create_Operator_Instance (Interfaces : in out O_Inter_List;
+                                       Info : Operator_Info_Acc) is
+   begin
+      Subprgs.Add_Subprg_Instance_Interfaces
+        (Interfaces, Info.Operator_Instance);
+   end Create_Operator_Instance;
+
+   procedure Start_Operator_Instance_Use (Info : Operator_Info_Acc) is
+   begin
+      Subprgs.Start_Subprg_Instance_Use (Info.Operator_Instance);
+   end Start_Operator_Instance_Use;
+
+   procedure Finish_Operator_Instance_Use (Info : Operator_Info_Acc) is
+   begin
+      Subprgs.Finish_Subprg_Instance_Use (Info.Operator_Instance);
+   end Finish_Operator_Instance_Use;
+
    function Translate_Static_Implicit_Conv
      (Expr : O_Cnode; Expr_Type : Iir; Res_Type : Iir) return O_Cnode
    is
@@ -1135,11 +1152,11 @@ package body Trans.Chap7 is
    function Translate_Predefined_Lib_Operator
      (Left, Right : O_Enode; Func : Iir_Function_Declaration) return O_Enode
    is
-      Info   : constant Subprg_Info_Acc := Get_Info (Func);
+      Info   : constant Operator_Info_Acc := Get_Info (Func);
       Constr : O_Assoc_List;
    begin
-      Start_Association (Constr, Info.Ortho_Func);
-      Subprgs.Add_Subprg_Instance_Assoc (Constr, Info.Subprg_Instance);
+      Start_Association (Constr, Info.Operator_Node);
+      Subprgs.Add_Subprg_Instance_Assoc (Constr, Info.Operator_Instance);
       New_Association (Constr, Left);
       if Right /= O_Enode_Null then
          New_Association (Constr, Right);
@@ -1151,14 +1168,14 @@ package body Trans.Chap7 is
      (Left, Right : O_Enode; Func : Iir) return O_Enode
    is
       Info      : constant Type_Info_Acc := Get_Info (Get_Return_Type (Func));
-      Func_Info : constant Subprg_Info_Acc := Get_Info (Func);
+      Func_Info : constant Operator_Info_Acc := Get_Info (Func);
       Res       : O_Dnode;
       Constr    : O_Assoc_List;
    begin
       Create_Temp_Stack2_Mark;
       Res := Create_Temp (Info.Ortho_Type (Mode_Value));
-      Start_Association (Constr, Func_Info.Ortho_Func);
-      Subprgs.Add_Subprg_Instance_Assoc (Constr, Func_Info.Subprg_Instance);
+      Start_Association (Constr, Func_Info.Operator_Node);
+      Subprgs.Add_Subprg_Instance_Assoc (Constr, Func_Info.Operator_Instance);
       New_Association (Constr,
                        New_Address (New_Obj (Res),
                                     Info.Ortho_Ptr_Type (Mode_Value)));
@@ -4495,8 +4512,7 @@ package body Trans.Chap7 is
         Get_Identifier (Get_Type_Declarator (Arr_Type));
       Arr_Ptr_Type : constant O_Tnode := Info.Ortho_Ptr_Type (Mode_Value);
 
-      F_Info               : Subprg_Info_Acc;
-      L, R                 : O_Dnode;
+      F_Info               : Operator_Info_Acc;
       Interface_List       : O_Inter_List;
       If_Blk               : O_If_Block;
       Var_L_Len, Var_R_Len : O_Dnode;
@@ -4505,15 +4521,17 @@ package body Trans.Chap7 is
       Label                : O_Snode;
       El_Otype             : O_Tnode;
    begin
-      F_Info := Add_Info (Subprg, Kind_Subprg);
+      F_Info := Add_Info (Subprg, Kind_Operator);
       --Chap2.Clear_Instance_Data (F_Info.Subprg_Instance);
 
       --  Create function.
       Start_Function_Decl (Interface_List, Create_Identifier (Id, "_CMP"),
                            Global_Storage, Ghdl_Compare_Type);
-      New_Interface_Decl (Interface_List, L, Wki_Left, Arr_Ptr_Type);
-      New_Interface_Decl (Interface_List, R, Wki_Right, Arr_Ptr_Type);
-      Finish_Subprogram_Decl (Interface_List, F_Info.Ortho_Func);
+      New_Interface_Decl (Interface_List, F_Info.Operator_Left,
+                          Wki_Left, Arr_Ptr_Type);
+      New_Interface_Decl (Interface_List, F_Info.Operator_Right,
+                          Wki_Right, Arr_Ptr_Type);
+      Finish_Subprogram_Decl (Interface_List, F_Info.Operator_Node);
 
       if Global_Storage = O_Storage_External then
          return;
@@ -4521,7 +4539,7 @@ package body Trans.Chap7 is
 
       El_Otype := Get_Ortho_Type
         (Get_Element_Subtype (Arr_Type), Mode_Value);
-      Start_Subprogram_Body (F_Info.Ortho_Func);
+      Start_Subprogram_Body (F_Info.Operator_Node);
       --  Compute length of L and R.
       New_Var_Decl (Var_L_Len, Wki_L_Len,
                     O_Storage_Local, Ghdl_Index_Type);
@@ -4531,10 +4549,12 @@ package body Trans.Chap7 is
       New_Var_Decl (Var_I, Wki_I, O_Storage_Local, Ghdl_Index_Type);
       New_Assign_Stmt (New_Obj (Var_L_Len),
                        Chap6.Get_Array_Bound_Length
-                         (Dp2M (L, Info, Mode_Value), Arr_Type, 1));
+                         (Dp2M (F_Info.Operator_Left, Info, Mode_Value),
+                          Arr_Type, 1));
       New_Assign_Stmt (New_Obj (Var_R_Len),
                        Chap6.Get_Array_Bound_Length
-                         (Dp2M (R, Info, Mode_Value), Arr_Type, 1));
+                         (Dp2M (F_Info.Operator_Right, Info, Mode_Value),
+                          Arr_Type, 1));
       --  Find the minimum length.
       Start_If_Stmt (If_Blk,
                      New_Compare_Op (ON_Ge,
@@ -4566,13 +4586,15 @@ package body Trans.Chap7 is
       New_Assign_Stmt
         (New_Obj (Var_L_El),
          M2E (Chap3.Index_Base
-           (Chap3.Get_Composite_Base (Dp2M (L, Info, Mode_Value)),
-                Arr_Type,
-                New_Obj_Value (Var_I))));
+                (Chap3.Get_Composite_Base
+                   (Dp2M (F_Info.Operator_Left, Info, Mode_Value)),
+                 Arr_Type,
+                 New_Obj_Value (Var_I))));
       New_Assign_Stmt
         (New_Obj (Var_R_El),
          M2E (Chap3.Index_Base
-           (Chap3.Get_Composite_Base (Dp2M (R, Info, Mode_Value)),
+                (Chap3.Get_Composite_Base
+                   (Dp2M (F_Info.Operator_Right, Info, Mode_Value)),
                 Arr_Type,
                 New_Obj_Value (Var_I))));
       Gen_Compare (Var_L_El, Var_R_El);
@@ -4657,8 +4679,7 @@ package body Trans.Chap7 is
       Id             : constant Name_Id :=
         Get_Identifier (Get_Type_Declarator (Arr_Type));
       Arr_Ptr_Type   : constant O_Tnode := Info.Ortho_Ptr_Type (Mode_Value);
-      F_Info         : Subprg_Info_Acc;
-      Var_L, Var_R   : O_Dnode;
+      F_Info         : Operator_Info_Acc;
       L, R           : Mnode;
       Interface_List : O_Inter_List;
       Indexes        : Iir_List;
@@ -4669,28 +4690,30 @@ package body Trans.Chap7 is
       Label          : O_Snode;
       Le, Re         : Mnode;
    begin
-      F_Info := Add_Info (Subprg, Kind_Subprg);
+      F_Info := Add_Info (Subprg, Kind_Operator);
 
       --  Create function.
       Start_Function_Decl (Interface_List, Create_Identifier (Id, "_EQ"),
                            Global_Storage, Std_Boolean_Type_Node);
-      Subprgs.Create_Subprg_Instance (Interface_List, Subprg);
-      New_Interface_Decl (Interface_List, Var_L, Wki_Left, Arr_Ptr_Type);
-      New_Interface_Decl (Interface_List, Var_R, Wki_Right, Arr_Ptr_Type);
-      Finish_Subprogram_Decl (Interface_List, F_Info.Ortho_Func);
+      Create_Operator_Instance (Interface_List, F_Info);
+      New_Interface_Decl (Interface_List, F_Info.Operator_Left,
+                          Wki_Left, Arr_Ptr_Type);
+      New_Interface_Decl (Interface_List, F_Info.Operator_Right,
+                          Wki_Right, Arr_Ptr_Type);
+      Finish_Subprogram_Decl (Interface_List, F_Info.Operator_Node);
 
       if Global_Storage = O_Storage_External then
          return;
       end if;
 
-      L := Dp2M (Var_L, Info, Mode_Value);
-      R := Dp2M (Var_R, Info, Mode_Value);
+      L := Dp2M (F_Info.Operator_Left, Info, Mode_Value);
+      R := Dp2M (F_Info.Operator_Right, Info, Mode_Value);
 
       Indexes := Get_Index_Subtype_List (Arr_Type);
       Nbr_Indexes := Get_Nbr_Elements (Indexes);
 
-      Start_Subprogram_Body (F_Info.Ortho_Func);
-      Subprgs.Start_Subprg_Instance_Use (Subprg);
+      Start_Subprogram_Body (F_Info.Operator_Node);
+      Start_Operator_Instance_Use (F_Info);
       --  for each dimension:  if length mismatch: return false
       for I in 1 .. Nbr_Indexes loop
          Start_If_Stmt
@@ -4736,18 +4759,19 @@ package body Trans.Chap7 is
       Close_Temp;
       Inc_Var (Var_I);
       Finish_Loop_Stmt (Label);
-      Subprgs.Finish_Subprg_Instance_Use (Subprg);
+      Finish_Operator_Instance_Use (F_Info);
       Finish_Subprogram_Body;
    end Translate_Predefined_Array_Equality;
 
    procedure Translate_Predefined_Record_Equality (Subprg : Iir)
    is
-      F_Info         : Subprg_Info_Acc;
-      Rec_Type       : Iir_Record_Type_Definition;
-      Rec_Ptr_Type   : O_Tnode;
-      Info           : Type_Info_Acc;
-      Id             : Name_Id;
-      Var_L, Var_R   : O_Dnode;
+      Rec_Type       : constant Iir_Record_Type_Definition :=
+        Get_Type (Get_Interface_Declaration_Chain (Subprg));
+      Info           : constant Type_Info_Acc := Get_Info (Rec_Type);
+      Id             : constant Name_Id  :=
+        Get_Identifier (Get_Type_Declarator (Rec_Type));
+      Rec_Ptr_Type   : constant O_Tnode := Info.Ortho_Ptr_Type (Mode_Value);
+      F_Info         : Operator_Info_Acc;
       L, R           : Mnode;
       Interface_List : O_Inter_List;
       If_Blk         : O_If_Block;
@@ -4756,31 +4780,28 @@ package body Trans.Chap7 is
       El_List : Iir_List;
       El      : Iir_Element_Declaration;
    begin
-      Rec_Type := Get_Type (Get_Interface_Declaration_Chain (Subprg));
-      Info := Get_Info (Rec_Type);
-      Id := Get_Identifier (Get_Type_Declarator (Rec_Type));
-      Rec_Ptr_Type := Info.Ortho_Ptr_Type (Mode_Value);
-
-      F_Info := Add_Info (Subprg, Kind_Subprg);
+      F_Info := Add_Info (Subprg, Kind_Operator);
       --Chap2.Clear_Instance_Data (F_Info.Subprg_Instance);
 
       --  Create function.
       Start_Function_Decl (Interface_List, Create_Identifier (Id, "_EQ"),
                            Global_Storage, Std_Boolean_Type_Node);
-      Subprgs.Create_Subprg_Instance (Interface_List, Subprg);
-      New_Interface_Decl (Interface_List, Var_L, Wki_Left, Rec_Ptr_Type);
-      New_Interface_Decl (Interface_List, Var_R, Wki_Right, Rec_Ptr_Type);
-      Finish_Subprogram_Decl (Interface_List, F_Info.Ortho_Func);
+      Create_Operator_Instance (Interface_List, F_Info);
+      New_Interface_Decl (Interface_List, F_Info.Operator_Left,
+                          Wki_Left, Rec_Ptr_Type);
+      New_Interface_Decl (Interface_List, F_Info.Operator_Right,
+                          Wki_Right, Rec_Ptr_Type);
+      Finish_Subprogram_Decl (Interface_List, F_Info.Operator_Node);
 
       if Global_Storage = O_Storage_External then
          return;
       end if;
 
-      Start_Subprogram_Body (F_Info.Ortho_Func);
-      Subprgs.Start_Subprg_Instance_Use (Subprg);
+      Start_Subprogram_Body (F_Info.Operator_Node);
+      Start_Operator_Instance_Use (F_Info);
 
-      L := Dp2M (Var_L, Info, Mode_Value);
-      R := Dp2M (Var_R, Info, Mode_Value);
+      L := Dp2M (F_Info.Operator_Left, Info, Mode_Value);
+      R := Dp2M (F_Info.Operator_Right, Info, Mode_Value);
 
       --   Compare each element.
       El_List := Get_Elements_Declaration_List (Rec_Type);
@@ -4800,7 +4821,7 @@ package body Trans.Chap7 is
          Close_Temp;
       end loop;
       New_Return_Stmt (New_Lit (Std_Boolean_True_Node));
-      Subprgs.Finish_Subprg_Instance_Use (Subprg);
+      Finish_Operator_Instance_Use (F_Info);
       Finish_Subprogram_Body;
    end Translate_Predefined_Record_Equality;
 
@@ -4814,11 +4835,10 @@ package body Trans.Chap7 is
       Id                : constant Name_Id :=
         Get_Identifier (Get_Type_Declarator (Arr_Type));
       Arr_Ptr_Type      : constant O_Tnode := Info.Ortho_Ptr_Type (Mode_Value);
-      F_Info            : Subprg_Info_Acc;
+      F_Info            : Operator_Info_Acc;
       Interface_List    : O_Inter_List;
       Var_Res           : O_Dnode;
       Res               : Mnode;
-      L, R              : O_Dnode;
       Var_Length, Var_I : O_Dnode;
       Var_Base          : O_Dnode;
       Var_L_Base        : O_Dnode;
@@ -4831,9 +4851,9 @@ package body Trans.Chap7 is
       Op                : ON_Op_Kind;
       Do_Invert         : Boolean;
    begin
-      F_Info := Add_Info (Subprg, Kind_Subprg);
+      F_Info := Add_Info (Subprg, Kind_Operator);
       --Chap2.Clear_Instance_Data (F_Info.Subprg_Instance);
-      F_Info.Use_Stack2 := True;
+      F_Info.Operator_Stack2 := True;
 
       Is_Monadic := False;
       case Get_Implicit_Definition (Subprg) is
@@ -4876,17 +4896,19 @@ package body Trans.Chap7 is
       --  via a result record, a concatenation returns its value without
       --  the use of the record.
       New_Interface_Decl (Interface_List, Var_Res, Wki_Res, Arr_Ptr_Type);
-      New_Interface_Decl (Interface_List, L, Wki_Left, Arr_Ptr_Type);
+      New_Interface_Decl (Interface_List, F_Info.Operator_Left,
+                          Wki_Left, Arr_Ptr_Type);
       if not Is_Monadic then
-         New_Interface_Decl (Interface_List, R, Wki_Right, Arr_Ptr_Type);
+         New_Interface_Decl (Interface_List, F_Info.Operator_Right,
+                             Wki_Right, Arr_Ptr_Type);
       end if;
-      Finish_Subprogram_Decl (Interface_List, F_Info.Ortho_Func);
+      Finish_Subprogram_Decl (Interface_List, F_Info.Operator_Node);
 
       if Global_Storage = O_Storage_External then
          return;
       end if;
 
-      Start_Subprogram_Body (F_Info.Ortho_Func);
+      Start_Subprogram_Body (F_Info.Operator_Node);
       New_Var_Decl (Var_Length, Wki_Length, O_Storage_Local,
                     Ghdl_Index_Type);
       New_Var_Decl (Var_I, Wki_I, O_Storage_Local, Ghdl_Index_Type);
@@ -4901,17 +4923,19 @@ package body Trans.Chap7 is
       end if;
       Open_Temp;
       --  Get length of LEFT.
-      New_Assign_Stmt (New_Obj (Var_Length),
-                       Chap6.Get_Array_Bound_Length
-                         (Dp2M (L, Info, Mode_Value), Arr_Type, 1));
+      New_Assign_Stmt
+        (New_Obj (Var_Length),
+         Chap6.Get_Array_Bound_Length
+           (Dp2M (F_Info.Operator_Left, Info, Mode_Value), Arr_Type, 1));
       --  If dyadic, check RIGHT has the same length.
       if not Is_Monadic then
          Chap6.Check_Bound_Error
-           (New_Compare_Op (ON_Neq,
-            New_Obj_Value (Var_Length),
-            Chap6.Get_Array_Bound_Length
-              (Dp2M (R, Info, Mode_Value), Arr_Type, 1),
-            Ghdl_Bool_Type),
+           (New_Compare_Op
+              (ON_Neq,
+               New_Obj_Value (Var_Length),
+               Chap6.Get_Array_Bound_Length
+                 (Dp2M (F_Info.Operator_Right, Info, Mode_Value), Arr_Type, 1),
+               Ghdl_Bool_Type),
             Subprg, 0);
       end if;
 
@@ -4919,16 +4943,19 @@ package body Trans.Chap7 is
       Res := Dp2M (Var_Res, Info, Mode_Value);
       Chap3.Translate_Object_Allocation
         (Res, Alloc_Return, Arr_Type,
-         Chap3.Get_Array_Bounds (Dp2M (L, Info, Mode_Value)));
+         Chap3.Get_Array_Bounds
+           (Dp2M (F_Info.Operator_Left, Info, Mode_Value)));
       New_Assign_Stmt
         (New_Obj (Var_Base), M2Addr (Chap3.Get_Composite_Base (Res)));
       New_Assign_Stmt
         (New_Obj (Var_L_Base),
-         M2Addr (Chap3.Get_Composite_Base (Dp2M (L, Info, Mode_Value))));
+         M2Addr (Chap3.Get_Composite_Base
+                   (Dp2M (F_Info.Operator_Left, Info, Mode_Value))));
       if not Is_Monadic then
          New_Assign_Stmt
            (New_Obj (Var_R_Base),
-            M2Addr (Chap3.Get_Composite_Base (Dp2M (R, Info, Mode_Value))));
+            M2Addr (Chap3.Get_Composite_Base
+                      (Dp2M (F_Info.Operator_Right, Info, Mode_Value))));
       end if;
 
       --  Do the logical operation on each element.
@@ -4936,9 +4963,9 @@ package body Trans.Chap7 is
       Start_Loop_Stmt (Label);
       Start_If_Stmt (If_Blk,
                      New_Compare_Op (ON_Ge,
-                       New_Obj_Value (Var_I),
-                       New_Obj_Value (Var_Length),
-                       Ghdl_Bool_Type));
+                                     New_Obj_Value (Var_I),
+                                     New_Obj_Value (Var_Length),
+                                     Ghdl_Bool_Type));
       New_Return_Stmt;
       Finish_If_Stmt (If_Blk);
       L_El := New_Value (New_Indexed_Element
@@ -4969,17 +4996,21 @@ package body Trans.Chap7 is
 
    procedure Translate_Predefined_Array_Shift (Subprg : Iir)
    is
-      F_Info         : Subprg_Info_Acc;
-      Inter          : Iir;
-      Arr_Type       : Iir_Array_Type_Definition;
-      Arr_Ptr_Type   : O_Tnode;
-      Int_Type       : O_Tnode;
+      Inter : constant Iir := Get_Interface_Declaration_Chain (Subprg);
+      Int_Info : constant Type_Info_Acc :=
+        Get_Info (Get_Type (Get_Chain (Inter)));
+      Int_Type : constant O_Tnode := Int_Info.Ortho_Type (Mode_Value);
+
       --  Info for the array type.
-      Info           : Type_Info_Acc;
-      Id             : Name_Id;
+      Arr_Type : constant Iir_Array_Type_Definition := Get_Type (Inter);
+      Info : constant Type_Info_Acc := Get_Info (Arr_Type);
+      Arr_Ptr_Type : constant O_Tnode := Info.Ortho_Ptr_Type (Mode_Value);
+
+      Id : constant Name_Id := Get_Identifier (Get_Type_Declarator (Arr_Type));
+
+      F_Info : Operator_Info_Acc;
       Interface_List : O_Inter_List;
       Var_Res        : O_Dnode;
-      Var_L, Var_R   : O_Dnode;
       Name           : O_Ident;
 
       type Shift_Kind is (Sh_Logical, Sh_Arith, Rotation);
@@ -5112,19 +5143,9 @@ package body Trans.Chap7 is
          Finish_Loop_Stmt (Label);
       end Do_Shift;
    begin
-      Inter := Get_Interface_Declaration_Chain (Subprg);
-
-      Info := Get_Info (Get_Type (Get_Chain (Inter)));
-      Int_Type := Info.Ortho_Type (Mode_Value);
-
-      Arr_Type := Get_Type (Inter);
-      Info := Get_Info (Arr_Type);
-      Id := Get_Identifier (Get_Type_Declarator (Arr_Type));
-      Arr_Ptr_Type := Info.Ortho_Ptr_Type (Mode_Value);
-
-      F_Info := Add_Info (Subprg, Kind_Subprg);
+      F_Info := Add_Info (Subprg, Kind_Operator);
       --Chap2.Clear_Instance_Data (F_Info.Subprg_Instance);
-      F_Info.Use_Stack2 := True;
+      F_Info.Operator_Stack2 := True;
 
       case Get_Implicit_Definition (Subprg) is
          when Iir_Predefined_Array_Sll
@@ -5152,16 +5173,18 @@ package body Trans.Chap7 is
       --  via a result record, a shift returns its value without
       --  the use of the record.
       New_Interface_Decl (Interface_List, Var_Res, Wki_Res, Arr_Ptr_Type);
-      New_Interface_Decl (Interface_List, Var_L, Wki_Left, Arr_Ptr_Type);
-      New_Interface_Decl (Interface_List, Var_R, Wki_Right, Int_Type);
-      Finish_Subprogram_Decl (Interface_List, F_Info.Ortho_Func);
+      New_Interface_Decl (Interface_List, F_Info.Operator_Left,
+                          Wki_Left, Arr_Ptr_Type);
+      New_Interface_Decl (Interface_List, F_Info.Operator_Right,
+                          Wki_Right, Int_Type);
+      Finish_Subprogram_Decl (Interface_List, F_Info.Operator_Node);
 
       if Global_Storage = O_Storage_External then
          return;
       end if;
 
       --  Body
-      Start_Subprogram_Body (F_Info.Ortho_Func);
+      Start_Subprogram_Body (F_Info.Operator_Node);
       New_Var_Decl (Var_Length, Wki_Length, O_Storage_Local,
                     Ghdl_Index_Type);
       if Shift /= Rotation then
@@ -5181,7 +5204,7 @@ package body Trans.Chap7 is
                          Ortho_Type (Mode_Value));
       end if;
       Res := Dp2M (Var_Res, Info, Mode_Value);
-      L := Dp2M (Var_L, Info, Mode_Value);
+      L := Dp2M (F_Info.Operator_Left, Info, Mode_Value);
 
       --  LRM93 7.2.3
       --  The index subtypes of the return values of all shift operators is
@@ -5201,13 +5224,13 @@ package body Trans.Chap7 is
          New_Dyadic_Op
            (ON_Or,
             New_Compare_Op (ON_Eq,
-              New_Obj_Value (Var_R),
-              New_Lit (New_Signed_Literal (Int_Type, 0)),
-              Ghdl_Bool_Type),
+                            New_Obj_Value (F_Info.Operator_Right),
+                            New_Lit (New_Signed_Literal (Int_Type, 0)),
+                            Ghdl_Bool_Type),
             New_Compare_Op (ON_Eq,
-              New_Obj_Value (Var_Length),
-              New_Lit (Ghdl_Index_0),
-              Ghdl_Bool_Type)));
+                            New_Obj_Value (Var_Length),
+                            New_Lit (Ghdl_Index_0),
+                            Ghdl_Bool_Type)));
       New_Assign_Stmt
         (M2Lp (Chap3.Get_Composite_Base (Res)),
          M2Addr (Chap3.Get_Composite_Base (L)));
@@ -5218,7 +5241,7 @@ package body Trans.Chap7 is
       New_Assign_Stmt
         (New_Obj (Var_Res_Base),
          Gen_Alloc (Alloc_Return, New_Obj_Value (Var_Length),
-           Info.B.Base_Ptr_Type (Mode_Value)));
+                    Info.B.Base_Ptr_Type (Mode_Value)));
       New_Assign_Stmt (M2Lp (Chap3.Get_Composite_Base (Res)),
                        New_Obj_Value (Var_Res_Base));
 
@@ -5227,10 +5250,10 @@ package body Trans.Chap7 is
 
       Start_If_Stmt (If_Blk,
                      New_Compare_Op (ON_Gt,
-                       New_Obj_Value (Var_R),
-                       New_Lit (New_Signed_Literal (Int_Type,
-                         0)),
-                       Ghdl_Bool_Type));
+                                     New_Obj_Value (F_Info.Operator_Right),
+                                     New_Lit (New_Signed_Literal (Int_Type,
+                                                                  0)),
+                                     Ghdl_Bool_Type));
       --  R > 0.
       --  Ie, to the right
       case Shift is
@@ -5241,17 +5264,19 @@ package body Trans.Chap7 is
                New_Dyadic_Op
                  (ON_Sub_Ov,
                   New_Obj_Value (Var_Length),
-                  New_Dyadic_Op (ON_Mod_Ov,
-                    New_Convert_Ov (New_Obj_Value (Var_R),
-                      Ghdl_Index_Type),
-                    New_Obj_Value (Var_Length))));
+                  New_Dyadic_Op
+                    (ON_Mod_Ov,
+                     New_Convert_Ov (New_Obj_Value (F_Info.Operator_Right),
+                                     Ghdl_Index_Type),
+                     New_Obj_Value (Var_Length))));
 
          when Sh_Logical
             | Sh_Arith =>
             --  Real SRL or SRA.
             New_Assign_Stmt
               (New_Obj (Var_Rl),
-               New_Convert_Ov (New_Obj_Value (Var_R), Ghdl_Index_Type));
+               New_Convert_Ov (New_Obj_Value (F_Info.Operator_Right),
+                               Ghdl_Index_Type));
 
             Do_Shift (True);
       end case;
@@ -5265,19 +5290,21 @@ package body Trans.Chap7 is
             New_Assign_Stmt
               (New_Obj (Var_I1),
                New_Dyadic_Op (ON_Mod_Ov,
-                 New_Convert_Ov
-                   (New_Monadic_Op (ON_Neg_Ov,
-                    New_Obj_Value (Var_R)),
-                    Ghdl_Index_Type),
-                 New_Obj_Value (Var_Length)));
+                              New_Convert_Ov
+                                (New_Monadic_Op
+                                   (ON_Neg_Ov,
+                                    New_Obj_Value (F_Info.Operator_Right)),
+                                 Ghdl_Index_Type),
+                              New_Obj_Value (Var_Length)));
          when Sh_Logical
             | Sh_Arith =>
             --  Real SLL or SLA.
             New_Assign_Stmt
               (New_Obj (Var_Rl),
-               New_Convert_Ov (New_Monadic_Op (ON_Neg_Ov,
-                 New_Obj_Value (Var_R)),
-                 Ghdl_Index_Type));
+               New_Convert_Ov (New_Monadic_Op
+                                 (ON_Neg_Ov,
+                                  New_Obj_Value (F_Info.Operator_Right)),
+                               Ghdl_Index_Type));
 
             Do_Shift (False);
       end case;
@@ -5287,9 +5314,9 @@ package body Trans.Chap7 is
          --  *     If I1 = LENGTH then
          --  *        I1 := 0
          Start_If_Stmt (If_Blk, New_Compare_Op (ON_Ge,
-                        New_Obj_Value (Var_I1),
-                        New_Obj_Value (Var_Length),
-                        Ghdl_Bool_Type));
+                                                New_Obj_Value (Var_I1),
+                                                New_Obj_Value (Var_Length),
+                                                Ghdl_Bool_Type));
          Init_Var (Var_I1);
          Finish_If_Stmt (If_Blk);
 
@@ -5325,15 +5352,14 @@ package body Trans.Chap7 is
 
    procedure Translate_File_Subprogram (Subprg : Iir; File_Type : Iir)
    is
-      Etype      : Iir;
-      Tinfo      : Type_Info_Acc;
+      Etype      : constant Iir := Get_Type (Get_File_Type_Mark (File_Type));
+      Tinfo      : constant Type_Info_Acc := Get_Info (Etype);
       Kind       : Iir_Predefined_Functions;
-      F_Info     : Subprg_Info_Acc;
+      F_Info     : Operator_Info_Acc;
       Name       : O_Ident;
       Inter_List : O_Inter_List;
       Id         : Name_Id;
-      Var_File   : O_Dnode;
-      Var_Val    : O_Dnode;
+--      Var_File   : O_Dnode;
 
       procedure Translate_Rw (Val : Mnode; Val_Type : Iir; Proc : O_Dnode);
 
@@ -5369,7 +5395,7 @@ package body Trans.Chap7 is
             when Type_Mode_Scalar =>
                Start_Association (Assocs, Proc);
                --    compute file parameter (get an index)
-               New_Association (Assocs, New_Obj_Value (Var_File));
+               New_Association (Assocs, New_Obj_Value (F_Info.Operator_Left));
                --    compute the value.
                New_Association
                  (Assocs, New_Convert_Ov (M2Addr (Val), Ghdl_Ptr_Type));
@@ -5427,7 +5453,7 @@ package body Trans.Chap7 is
          Assocs : O_Assoc_List;
       begin
          Start_Association (Assocs, Proc);
-         New_Association (Assocs, New_Obj_Value (Var_File));
+         New_Association (Assocs, New_Obj_Value (F_Info.Operator_Left));
          New_Association
            (Assocs, New_Unchecked_Address (New_Obj (Var_Length),
             Ghdl_Ptr_Type));
@@ -5439,16 +5465,14 @@ package body Trans.Chap7 is
 
       Var : Mnode;
    begin
-      Etype := Get_Type (Get_File_Type_Mark (File_Type));
-      Tinfo := Get_Info (Etype);
       if Tinfo.Type_Mode in Type_Mode_Scalar then
          --  Intrinsic.
          return;
       end if;
 
-      F_Info := Add_Info (Subprg, Kind_Subprg);
+      F_Info := Add_Info (Subprg, Kind_Operator);
       --Chap2.Clear_Instance_Data (F_Info.Subprg_Instance);
-      F_Info.Use_Stack2 := False;
+      F_Info.Operator_Stack2 := False;
 
       Id := Get_Identifier (Get_Type_Declarator (File_Type));
       Kind := Get_Implicit_Definition (Subprg);
@@ -5469,25 +5493,23 @@ package body Trans.Chap7 is
       else
          Start_Procedure_Decl (Inter_List, Name, Global_Storage);
       end if;
-      Subprgs.Create_Subprg_Instance (Inter_List, Subprg);
+      Create_Operator_Instance (Inter_List, F_Info);
 
-      New_Interface_Decl
-        (Inter_List, Var_File, Get_Identifier ("FILE"),
-         Ghdl_File_Index_Type);
-      New_Interface_Decl
-        (Inter_List, Var_Val, Wki_Val,
-         Tinfo.Ortho_Ptr_Type (Mode_Value));
-      Finish_Subprogram_Decl (Inter_List, F_Info.Ortho_Func);
+      New_Interface_Decl (Inter_List, F_Info.Operator_Left,
+                          Get_Identifier ("FILE"), Ghdl_File_Index_Type);
+      New_Interface_Decl (Inter_List, F_Info.Operator_Right,
+                          Wki_Val, Tinfo.Ortho_Ptr_Type (Mode_Value));
+      Finish_Subprogram_Decl (Inter_List, F_Info.Operator_Node);
 
       if Global_Storage = O_Storage_External then
          return;
       end if;
 
-      Start_Subprogram_Body (F_Info.Ortho_Func);
-      Subprgs.Start_Subprg_Instance_Use (Subprg);
+      Start_Subprogram_Body (F_Info.Operator_Node);
+      Start_Operator_Instance_Use (F_Info);
       Push_Local_Factory;
 
-      Var := Dp2M (Var_Val, Tinfo, Mode_Value);
+      Var := Dp2M (F_Info.Operator_Right, Tinfo, Mode_Value);
 
       case Kind is
          when Iir_Predefined_Write =>
@@ -5533,7 +5555,7 @@ package body Trans.Chap7 is
          when others =>
             raise Internal_Error;
       end case;
-      Subprgs.Finish_Subprg_Instance_Use (Subprg);
+      Finish_Operator_Instance_Use (F_Info);
       Pop_Local_Factory;
       Finish_Subprogram_Body;
    end Translate_File_Subprogram;
