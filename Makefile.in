@@ -34,6 +34,7 @@ LDFLAGS=@LDFLAGS@
 LIBBACKTRACE=@backtrace_lib@
 llvm_be=@llvm_be@
 build_mode=@build_mode@
+enable_werror=@enable_werror@
 
 INSTALL_PROGRAM=install -m 755
 INSTALL_DATA=install -m 644
@@ -78,7 +79,9 @@ WARN_CFLAGS=-Wall
 GNAT_BARGS=-bargs -E
 
 # Warnings as errors.  Comment this line if a warning looks not valid.
+ifeq "$(enable_werror)" "true"
 GNATFLAGS+=-gnatwe
+endif
 
 target=$(build)
 #target=i686-pc-linux-gnu
@@ -106,7 +109,16 @@ copy-sources: copy-sources.$(backend)
 
 libs: libs.vhdl.$(backend)
 
-Makefile: $(srcdir)/Makefile.in
+./config.status: $(srcdir)/configure
+	@if [ -e $@ ]; then \
+	  echo "./config.status --reconfigure"; \
+	  ./config.status --reconfigure; \
+	else \
+	  echo "config.status is lost, please configure manually" ; \
+	  exit 1; \
+	fi
+
+Makefile: $(srcdir)/Makefile.in ./config.status
 	./config.status
 
 GHDL_COMMON_INCFLAGS=-aI$(srcdir)/src -aI$(srcdir)/src/vhdl -aI$(srcdir)/src/grt -aI$(srcdir)/src/psl -aI$(srcdir)/src/vhdl/translate
@@ -181,11 +193,12 @@ copy-sources.gcc: version.ads
 	$(CP) -p $(srcdir)/src/ortho/gcc/*.opt $(gcc_vhdl_dir)
 	base_ver=`cat $(gcc_src_dir)/gcc/BASE-VER`; \
 	case $$base_ver in \
-	 4.9*) gcc_ortho_lang=ortho-lang.c ;; \
+	 4.9*) gcc_ortho_lang=ortho-lang-49.c ;; \
 	 5.*)  gcc_ortho_lang=ortho-lang-5.c ;; \
 	 6.*)  gcc_ortho_lang=ortho-lang-6.c ;; \
-	 *) echo "Mismatch gcc version from $gcc_src_dir" \
-	    echo "Need gcc version 4.9.x, 5.x or 6.x" \
+	 7.*)  gcc_ortho_lang=ortho-lang-7.c ;; \
+	 *) echo "Mismatch gcc version from $(gcc_src_dir)"; \
+	    echo "Need gcc version 4.9.x, 5.x, 6.x or 7.x"; \
 	    exit 1 ;; \
 	esac; \
 	$(CP) -p $(srcdir)/src/ortho/gcc/$$gcc_ortho_lang \
@@ -450,7 +463,7 @@ clean: force
 	$(RM) -rf lib
 
 distclean: clean
-	$(RM) -f default_pathes.ads ortho_code-x86-flags.ads
+	$(RM) -f default_paths.ads ortho_code-x86-flags.ads
 	$(RM) -f grt/grt-backtrace-impl.ads
 	$(RM) -f Makefile config.status ghdl.gpr
 

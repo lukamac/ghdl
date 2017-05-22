@@ -44,7 +44,8 @@ package Trans.Chap3 is
    procedure Translate_Anonymous_Type_Definition (Def : Iir);
 
    --  Translate subprograms for types.
-   procedure Translate_Type_Subprograms (Decl : Iir);
+   procedure Translate_Type_Subprograms
+     (Decl : Iir; Kind : Subprg_Translate_Kind);
 
    procedure Create_Type_Definition_Type_Range (Def : Iir);
    function Create_Static_Composite_Subtype_Bounds (Def : Iir) return O_Cnode;
@@ -57,7 +58,8 @@ package Trans.Chap3 is
    procedure Call_Ghdl_Protected_Procedure (Type_Def : Iir; Proc : O_Dnode);
 
    procedure Translate_Protected_Type_Body (Bod : Iir);
-   procedure Translate_Protected_Type_Body_Subprograms (Bod : Iir);
+   procedure Translate_Protected_Type_Body_Subprograms_Spec (Bod : Iir);
+   procedure Translate_Protected_Type_Body_Subprograms_Body (Bod : Iir);
 
    --  Translate_type_definition_Elab do 4 and 6.
    --  It generates code to do type elaboration.

@@ -281,8 +281,7 @@ package body Trans.Chap4 is
       Pkg_Info : constant Ortho_Info_Acc := Get_Info (Pkg);
       Info     : Ortho_Info_Acc;
    begin
-      Chap2.Instantiate_Info_Package (Inter);
-      Info := Get_Info (Inter);
+      Info := Add_Info (Inter, Kind_Package_Instance);
 
       --  The spec
       Info.Package_Instance_Spec_Var :=
@@ -299,6 +298,8 @@ package body Trans.Chap4 is
       Set_Scope_Via_Var_Ptr
         (Info.Package_Instance_Body_Scope,
          Info.Package_Instance_Body_Var);
+
+      Chap2.Instantiate_Info_Package (Inter);
    end Create_Package_Interface;
 
    procedure Allocate_Complex_Object (Obj_Type   : Iir;
@@ -2321,8 +2322,17 @@ package body Trans.Chap4 is
       Create_Union_Scope (State_Scope.all, Scope_Type);
    end Translate_Statements_Chain_State_Declaration;
 
-   procedure Translate_Declaration_Chain_Subprograms (Parent : Iir)
+   procedure Translate_Declaration_Chain_Subprograms
+     (Parent : Iir; What : Subprg_Translate_Kind)
    is
+      --  True iff specs must be translated.
+      Do_Specs : constant Boolean := What in Subprg_Translate_Spec;
+
+      --  True iff bodies must be translated.
+      Do_Bodies : constant Boolean :=
+        (What in Subprg_Translate_Body
+           and then Global_Storage /= O_Storage_External);
+
       El     : Iir;
       Infos  : Chap7.Implicit_Subprogram_Infos;
    begin
@@ -2341,48 +2351,65 @@ package body Trans.Chap4 is
                           | Iir_Predefined_Record_Equality =>
                            --  Used implicitly in case statement or other
                            --  predefined equality.
-                           Chap7.Translate_Implicit_Subprogram (El, Infos);
+                           if Do_Specs then
+                              Chap7.Translate_Implicit_Subprogram_Spec
+                                (El, Infos);
+                           end if;
+                           if Do_Bodies then
+                              Chap7.Translate_Implicit_Subprogram_Body (El);
+                           end if;
                         when others =>
                            null;
                      end case;
                   else
-                     Chap7.Translate_Implicit_Subprogram (El, Infos);
+                     if Do_Specs then
+                        Chap7.Translate_Implicit_Subprogram_Spec
+                          (El, Infos);
+                     end if;
+                     if Do_Bodies then
+                        Chap7.Translate_Implicit_Subprogram_Body (El);
+                     end if;
                   end if;
                else
                   --  Translate only if used.
-                  if Get_Info (El) /= null then
+                  if Do_Specs and then Get_Info (El) /= null then
                      Chap2.Translate_Subprogram_Declaration (El);
                      Translate_Resolution_Function (El);
                   end if;
                end if;
             when Iir_Kind_Function_Body
-               | Iir_Kind_Procedure_Body =>
-               --  Do not translate body if generating only specs (for
-               --  subprograms in an entity).
-               if Global_Storage /= O_Storage_External
-                 and then
-                   (not Flag_Discard_Unused
+              | Iir_Kind_Procedure_Body =>
+               if Do_Bodies then
+                  --  Do not translate body if generating only specs (for
+                  --  subprograms in an entity).
+                  if not Flag_Discard_Unused
                     or else
-                    Get_Use_Flag (Get_Subprogram_Specification (El)))
-               then
-                  Chap2.Translate_Subprogram_Body (El);
-                  Translate_Resolution_Function_Body
-                    (Get_Subprogram_Specification (El));
+                    Get_Use_Flag (Get_Subprogram_Specification (El))
+                  then
+                     Chap2.Translate_Subprogram_Body (El);
+                     Translate_Resolution_Function_Body
+                       (Get_Subprogram_Specification (El));
+                  end if;
                end if;
             when Iir_Kind_Type_Declaration
                | Iir_Kind_Anonymous_Type_Declaration =>
-               Chap3.Translate_Type_Subprograms (El);
+               Chap3.Translate_Type_Subprograms (El, What);
                Chap7.Init_Implicit_Subprogram_Infos (Infos);
             when Iir_Kind_Protected_Type_Body =>
-               Chap3.Translate_Protected_Type_Body (El);
-               Chap3.Translate_Protected_Type_Body_Subprograms (El);
+               if Do_Specs then
+                  Chap3.Translate_Protected_Type_Body (El);
+               end if;
+               if Do_Bodies then
+                  Chap3.Translate_Protected_Type_Body_Subprograms_Spec (El);
+                  Chap3.Translate_Protected_Type_Body_Subprograms_Body (El);
+               end if;
             when Iir_Kind_Package_Declaration
               | Iir_Kind_Package_Body =>
                declare
                   Mark  : Id_Mark_Type;
                begin
                   Push_Identifier_Prefix (Mark, Get_Identifier (El));
-                  Translate_Declaration_Chain_Subprograms (El);
+                  Translate_Declaration_Chain_Subprograms (El, What);
                   Pop_Identifier_Prefix (Mark);
                end;
             when Iir_Kind_Package_Instantiation_Declaration =>
@@ -2394,11 +2421,11 @@ package body Trans.Chap4 is
                      Mark  : Id_Mark_Type;
                   begin
                      Push_Identifier_Prefix (Mark, Get_Identifier (El));
-                     Translate_Declaration_Chain_Subprograms (El);
+                     Translate_Declaration_Chain_Subprograms (El, What);
                      if Is_Valid (Bod)
                        and then Global_Storage /= O_Storage_External
                      then
-                        Translate_Declaration_Chain_Subprograms (Bod);
+                        Translate_Declaration_Chain_Subprograms (Bod, What);
                      end if;
                      Pop_Identifier_Prefix (Mark);
                   end;

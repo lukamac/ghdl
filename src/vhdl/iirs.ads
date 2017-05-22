@@ -897,7 +897,7 @@ package Iirs is
    --  type.
    --   Get/Set_Macro_Expanded_Flag (Flag2)
    --
-   --  True if the package declaration at least one package instantiation
+   --  True if the package declaration has least one package instantiation
    --  declaration whose uninstantiated declaration needs both a body and
    --  macro-expansion.  In that case, the instantiation needs macro-expansion
    --  of their body.
@@ -4724,6 +4724,16 @@ package Iirs is
    subtype Iir_Predefined_Impure_Functions is Iir_Predefined_Functions range
      Iir_Predefined_Deallocate ..
      Iir_Predefined_Functions'Pred (Iir_Predefined_None);
+
+   subtype Iir_Predefined_TF_Array_Functions
+      is Iir_Predefined_Functions range
+     Iir_Predefined_TF_Array_And ..
+   --Iir_Predefined_TF_Array_Or
+   --Iir_Predefined_TF_Array_Nand
+   --Iir_Predefined_TF_Array_Nor
+   --Iir_Predefined_TF_Array_Xor
+   --Iir_Predefined_TF_Array_Xnor
+     Iir_Predefined_TF_Array_Not;
 
    subtype Iir_Predefined_Dyadic_TF_Array_Functions
    is Iir_Predefined_Functions range

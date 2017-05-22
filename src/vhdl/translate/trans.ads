@@ -171,6 +171,16 @@ package Trans is
    type Allocation_Kind is
      (Alloc_Stack, Alloc_Return, Alloc_Heap, Alloc_System);
 
+   --  Sometimes useful to factorize code.  Defines what has to be translated.
+   type Subprg_Translate_Kind is
+     (Subprg_Translate_Only_Spec,
+      Subprg_Translate_Spec_And_Body,
+      Subprg_Translate_Only_Body);
+   subtype Subprg_Translate_Spec is Subprg_Translate_Kind range
+     Subprg_Translate_Only_Spec .. Subprg_Translate_Spec_And_Body;
+   subtype Subprg_Translate_Body is Subprg_Translate_Kind range
+     Subprg_Translate_Spec_And_Body .. Subprg_Translate_Only_Body;
+
    --  Return the value of field FIELD of lnode L that is contains
    --   a pointer to a record.
    --  This is equivalent to:
@@ -592,7 +602,8 @@ package Trans is
 
       --  Add a field in the current factory that reference the current
       --  instance.
-      procedure Add_Subprg_Instance_Field (Field : out O_Fnode);
+      procedure Add_Subprg_Instance_Field
+        (Field : out O_Fnode; Prev_Scope : out Var_Scope_Acc);
 
       --  Associate values to the instance interface during invocation of a
       --  subprogram.
@@ -618,9 +629,9 @@ package Trans is
 
       --  Call Push_Scope to reference instance from FIELD.
       procedure Start_Prev_Subprg_Instance_Use_Via_Field
-        (Prev : Subprg_Instance_Stack; Field : O_Fnode);
+        (Prev_Scope : Var_Scope_Acc; Field : O_Fnode);
       procedure Finish_Prev_Subprg_Instance_Use_Via_Field
-        (Prev : Subprg_Instance_Stack; Field : O_Fnode);
+        (Prev_Scope : Var_Scope_Acc; Field : O_Fnode);
 
       --  Same as above, but for IIR.
       procedure Create_Subprg_Instance (Interfaces : in out O_Inter_List;
@@ -744,6 +755,7 @@ package Trans is
 
          when Kind_Type_Protected =>
             Prot_Scope : aliased Var_Scope_Type;
+            Prot_Prev_Scope : Var_Scope_Acc;
 
             --  Init procedure for the protected type.
             Prot_Init_Subprg           : O_Dnode;
@@ -767,8 +779,13 @@ package Trans is
             Nocheck_Low : Boolean := False;
             Nocheck_Hi  : Boolean := False;
 
+            --  For scalar types:
+            --  Range_Var is the same as its type mark (there is no need to
+            --  create a new range var if the range is the same).
+            Same_Range : Boolean := False;
+
             --  Tree for the range record declaration.
-            Range_Var : Var_Type;
+            Range_Var : Var_Type := Null_Var;
 
          when Kind_Type_Array
            | Kind_Type_Record =>
@@ -841,6 +858,7 @@ package Trans is
      (Kind => Kind_Type_Protected,
       Rti_Max_Depth => 0,
       Prot_Scope => Null_Var_Scope,
+      Prot_Prev_Scope => null,
       Prot_Init_Subprg => O_Dnode_Null,
       Prot_Init_Instance => Subprgs.Null_Subprg_Instance,
       Prot_Final_Subprg => O_Dnode_Null,
@@ -1259,7 +1277,11 @@ package Trans is
             --  subprograms.
 
             --  Use secondary stack (not referenced).
-            Operator_Stack2 : Boolean;
+            Operator_Stack2 : Boolean := False;
+
+            --  True if the body was generated.  Many operators share the same
+            --  subprogram.
+            Operator_Body : Boolean := False;
 
             --  Subprogram declaration node.
             Operator_Node : O_Dnode;
@@ -1270,6 +1292,7 @@ package Trans is
 
             --  Parameters
             Operator_Left, Operator_Right : O_Dnode;
+            Operator_Res : O_Dnode;
 
          when Kind_Call =>
             Call_State_Scope : aliased Var_Scope_Type;

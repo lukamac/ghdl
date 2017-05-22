@@ -891,7 +891,11 @@ package body Sem_Names is
       Atype := Name_To_Type_Definition (Res);
 
       if Is_Error (Atype) then
-         Set_Named_Entity (Res, Atype);
+         if Get_Kind (Res) in Iir_Kinds_Denoting_Name then
+            Set_Named_Entity (Res, Atype);
+         else
+            return Create_Error_Type (Name);
+         end if;
       elsif not Incomplete then
          if Get_Kind (Atype) = Iir_Kind_Incomplete_Type_Definition then
             Error_Msg_Sem
@@ -1295,6 +1299,11 @@ package body Sem_Names is
            | Iir_Kind_String_Literal8 =>
             Error_Msg_Sem
               (+Actual, "%n cannot be a type conversion operand", +Actual);
+            return Conv;
+         when Iir_Kind_Range_Expression =>
+            --  Try to nicely handle expression like NAME (A to B).
+            Error_Msg_Sem
+              (+Actual, "subtype indication not allowed in an expression");
             return Conv;
          when others =>
             -- LRM93 7.3.5
@@ -1831,7 +1840,7 @@ package body Sem_Names is
          Res_List := Create_Iir_List;
          N := 0;
          --  The SEEN_FLAG is used to get only one meaning which can be reached
-         --  through several pathes (such as aliases).
+         --  through several paths (such as aliases).
          while Valid_Interpretation (Interpretation) loop
             if Keep_Alias then
                Res := Get_Declaration (Interpretation);
