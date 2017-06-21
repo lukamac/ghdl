@@ -167,7 +167,7 @@ package body Trans.Chap3 is
         (Assoc, M2Addr (Chap3.Unbox_Record (Chap3.Get_Composite_Base (Var))));
 
       if Binfo.Type_Mode in Type_Mode_Unbounded then
-         New_Association (Assoc, M2Addr (Chap3.Get_Array_Bounds (Var)));
+         New_Association (Assoc, M2Addr (Chap3.Get_Composite_Bounds (Var)));
       end if;
 
       return New_Function_Call (Assoc);
@@ -1298,8 +1298,8 @@ package body Trans.Chap3 is
       El   : Iir_Element_Declaration;
 
       Off_Var    : O_Dnode;
-      Ptr_Var    : O_Dnode;
       Off_Val    : O_Enode;
+      El_Off     : O_Enode;
       Sub_Bound  : Mnode;
       El_Type    : Iir;
       Inner_Type : Iir;
@@ -1346,28 +1346,37 @@ package body Trans.Chap3 is
                Get_Info (El).Field_Node (Kind)),
                New_Obj_Value (Off_Var));
 
+            Open_Temp;
+
             if Is_Complex_Type (El_Tinfo)
               and then El_Tinfo.C (Kind).Builder_Need_Func
             then
                --  This type needs a builder, call it.
-               Start_Declare_Stmt;
-               New_Var_Decl
-                 (Ptr_Var, Get_Identifier ("var_ptr"),
-                  O_Storage_Local, El_Tinfo.Ortho_Ptr_Type (Kind));
+               declare
+                  Base2 : Mnode;
+                  Ptr_Var    : O_Dnode;
+               begin
+                  if Is_Unbounded_Type (Info) then
+                     Base2 := Create_Temp (Info, Kind);
+                     New_Assign_Stmt
+                       (M2Lp (Get_Composite_Bounds (Base2)),
+                        New_Obj_Value (Info.C (Kind).Builder_Bound_Param));
+                     New_Assign_Stmt
+                       (M2Lp (Get_Composite_Base (Base2)),
+                        New_Obj_Value (Info.C (Kind).Builder_Base_Param));
+                  else
+                     Base2 := Dp2M (Base, Info, Kind);
+                  end if;
 
-               New_Assign_Stmt
-                 (New_Obj (Ptr_Var),
-                  M2E (Chap6.Translate_Selected_Element
-                    (Dp2M (Base, Info, Kind), El)));
+                  Ptr_Var := Create_Temp (El_Tinfo.Ortho_Ptr_Type (Kind));
 
-               New_Assign_Stmt
-                 (New_Obj (Off_Var),
-                  New_Dyadic_Op (ON_Add_Ov,
-                                 New_Obj_Value (Off_Var),
-                                 Gen_Call_Type_Builder
-                                   (Dp2M (Ptr_Var, El_Tinfo, Kind), El_Type)));
+                  New_Assign_Stmt
+                    (New_Obj (Ptr_Var),
+                     M2E (Chap6.Translate_Selected_Element (Base2, El)));
 
-               Finish_Declare_Stmt;
+                  El_Off := Gen_Call_Type_Builder
+                    (Dp2M (Ptr_Var, El_Tinfo, Kind), El_Type);
+               end;
             else
                if Is_Unbounded_Type (El_Tinfo) then
                   Sub_Bound := Bounds_To_Element_Bounds
@@ -1380,13 +1389,15 @@ package body Trans.Chap3 is
                end if;
 
                --  Allocate memory.
-               New_Assign_Stmt
-                 (New_Obj (Off_Var),
-                  New_Dyadic_Op
-                    (ON_Add_Ov,
-                     New_Obj_Value (Off_Var),
-                     Get_Subtype_Size (El_Type, Sub_Bound, Kind)));
+               El_Off := Get_Subtype_Size (El_Type, Sub_Bound, Kind);
             end if;
+
+            New_Assign_Stmt
+              (New_Obj (Off_Var),
+               New_Dyadic_Op (ON_Add_Ov,
+                              New_Obj_Value (Off_Var), El_Off));
+
+            Close_Temp;
          end if;
       end loop;
 
@@ -2667,7 +2678,7 @@ package body Trans.Chap3 is
       return Get_Array_Type_Bounds (Get_Info (Atype));
    end Get_Array_Type_Bounds;
 
-   function Get_Array_Bounds (Arr : Mnode) return Mnode
+   function Get_Composite_Bounds (Arr : Mnode) return Mnode
    is
       Info : constant Type_Info_Acc := Get_Type_Info (Arr);
    begin
@@ -2693,12 +2704,12 @@ package body Trans.Chap3 is
          when others =>
             raise Internal_Error;
       end case;
-   end Get_Array_Bounds;
+   end Get_Composite_Bounds;
 
    function Get_Array_Range (Arr : Mnode; Atype : Iir; Dim : Positive)
                              return Mnode is
    begin
-      return Bounds_To_Range (Get_Array_Bounds (Arr), Atype, Dim);
+      return Bounds_To_Range (Get_Composite_Bounds (Arr), Atype, Dim);
    end Get_Array_Range;
 
    function Get_Bounds_Length (Bounds : Mnode; Atype : Iir) return O_Enode
@@ -2751,7 +2762,7 @@ package body Trans.Chap3 is
       if Type_Info.Type_Locally_Constrained then
          return New_Lit (Get_Thin_Array_Length (Atype));
       else
-         return Get_Bounds_Length (Get_Array_Bounds (Arr), Atype);
+         return Get_Bounds_Length (Get_Composite_Bounds (Arr), Atype);
       end if;
    end Get_Array_Length;
 
@@ -3037,7 +3048,7 @@ package body Trans.Chap3 is
       Kind      : constant Object_Kind_Type := Get_Object_Kind (Obj);
    begin
       if Type_Info.Type_Mode in Type_Mode_Unbounded then
-         return Get_Subtype_Size (Obj_Type, Get_Array_Bounds (Obj), Kind);
+         return Get_Subtype_Size (Obj_Type, Get_Composite_Bounds (Obj), Kind);
       else
          return Get_Subtype_Size (Obj_Type, Mnode_Null, Kind);
       end if;
@@ -3069,14 +3080,14 @@ package body Trans.Chap3 is
       if Dinfo.Type_Mode in Type_Mode_Unbounded then
          --  Allocate memory for bounds.
          New_Assign_Stmt
-           (M2Lp (Chap3.Get_Array_Bounds (Res)),
+           (M2Lp (Chap3.Get_Composite_Bounds (Res)),
             Gen_Alloc (Alloc_Kind,
                        New_Lit (New_Sizeof (Dinfo.B.Bounds_Type,
                                             Ghdl_Index_Type)),
                        Dinfo.B.Bounds_Ptr_Type));
 
          --  Copy bounds to the allocated area.
-         Copy_Bounds (Chap3.Get_Array_Bounds (Res), Bounds, Obj_Type);
+         Copy_Bounds (Chap3.Get_Composite_Bounds (Res), Bounds, Obj_Type);
 
          --  Allocate base.
          Allocate_Fat_Array_Base (Alloc_Kind, Res, Obj_Type);

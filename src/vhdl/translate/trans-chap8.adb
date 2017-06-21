@@ -259,7 +259,7 @@ package body Trans.Chap8 is
                   Ret_Info, Mode_Value));
                Chap3.Translate_Object_Allocation
                  (Area, Alloc_Return, Ret_Type,
-                  Chap3.Get_Array_Bounds (Val));
+                  Chap3.Get_Composite_Bounds (Val));
                Chap3.Translate_Object_Copy (Area, M2Addr (Val), Ret_Type);
                Gen_Return;
             end;
@@ -2460,7 +2460,7 @@ package body Trans.Chap8 is
                end;
             when Iir_Kind_Type_Conversion =>
                return Chap7.Translate_Type_Conversion
-                 (Src, Get_Type (Expr), Get_Type (Conv), Null_Iir);
+                 (Src, Get_Type (Expr), Get_Type (Conv), Conv);
             when others =>
                Error_Kind ("do_conversion", Conv);
          end case;
@@ -2898,9 +2898,10 @@ package body Trans.Chap8 is
                                     Ftype_Info.B.Bounds_Type,
                                     Ftype_Info.B.Bounds_Ptr_Type));
                            Chap3.Copy_Bounds
-                             (Bnd, Chap3.Get_Array_Bounds (Mval), Formal_Type);
+                             (Bnd,
+                              Chap3.Get_Composite_Bounds (Mval), Formal_Type);
                            New_Assign_Stmt
-                             (M2Lp (Chap3.Get_Array_Bounds (Fat)),
+                             (M2Lp (Chap3.Get_Composite_Bounds (Fat)),
                               M2Addr (Bnd));
                            New_Assign_Stmt
                              (M2Lp (Chap3.Get_Composite_Base (Fat)),
