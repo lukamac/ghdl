@@ -92,8 +92,9 @@ package body std_logic_misc is
     -- conversion functions for STD_LOGIC_VECTOR and STD_ULOGIC_VECTOR
     --
     ---------------------------------------------------------------------
---START-!V08
+
 --synopsys synthesis_on
+--START-!V08
     function Drive (V: STD_LOGIC_VECTOR) return STD_ULOGIC_VECTOR is
       -- pragma built_in SYN_FEED_THRU
       -- pragma subpgm_id 389
@@ -106,6 +107,7 @@ package body std_logic_misc is
 --synopsys synthesis_on
     end Drive;
 --END-!V08
+
 
     function Drive (V: STD_ULOGIC_VECTOR) return STD_LOGIC_VECTOR is
       -- pragma built_in SYN_FEED_THRU
@@ -144,6 +146,7 @@ package body std_logic_misc is
     		return V;
     	end if;
     end Sense;
+
 
 --START-!V08
     function Sense (V: STD_ULOGIC_VECTOR; vZ, vU, vDC: STD_ULOGIC) 
@@ -229,6 +232,7 @@ package body std_logic_misc is
     	return Result;
     end Sense;
 --END-!V08
+
     ---------------------------------------------------------------------
     --
     --	Function: STD_LOGIC_VECTORtoBIT_VECTOR
@@ -503,6 +507,7 @@ package body std_logic_misc is
 
 
     --------------------------------------------------------------------------
+
 --START-!V08
     function AND_REDUCE(ARG: STD_LOGIC_VECTOR) return UX01 is
 	-- pragma subpgm_id 399
@@ -555,6 +560,7 @@ package body std_logic_misc is
         return not XOR_REDUCE(ARG);
     end;
 --END-!V08
+
     function AND_REDUCE(ARG: STD_ULOGIC_VECTOR) return UX01 is
 	-- pragma subpgm_id 405
 	variable result: STD_LOGIC;

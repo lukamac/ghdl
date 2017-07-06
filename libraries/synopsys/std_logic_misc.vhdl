@@ -72,14 +72,16 @@ package std_logic_misc is
     function Sense (V: STD_ULOGIC_VECTOR; vZ, vU, vDC: STD_ULOGIC) 
     					   return STD_LOGIC_VECTOR;
 --END-!V08
-		function Sense (V: STD_ULOGIC_VECTOR; vZ, vU, vDC: STD_ULOGIC) 
+    function Sense (V: STD_ULOGIC_VECTOR; vZ, vU, vDC: STD_ULOGIC) 
     					   return STD_ULOGIC_VECTOR;
+
 --START-!V08
     function Sense (V: STD_LOGIC_VECTOR; vZ, vU, vDC: STD_ULOGIC) 
     					   return STD_LOGIC_VECTOR;
     function Sense (V: STD_LOGIC_VECTOR; vZ, vU, vDC: STD_ULOGIC) 
     					   return STD_ULOGIC_VECTOR;
 --END-!V08
+
 --synopsys synthesis_on
 
 
@@ -159,7 +161,7 @@ package std_logic_misc is
         function NOR_REDUCE(ARG: STD_ULOGIC_VECTOR) return UX01;
         function XOR_REDUCE(ARG: STD_ULOGIC_VECTOR) return UX01;
         function XNOR_REDUCE(ARG: STD_ULOGIC_VECTOR) return UX01;
-    
+
 --synopsys synthesis_off
 	
         function fun_BUF3S(Input, Enable: UX01; Strn: STRENGTH) return STD_LOGIC;
