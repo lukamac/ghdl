@@ -2668,7 +2668,8 @@ package body Sem_Names is
          when Iir_Kinds_Process_Statement
            | Iir_Kind_Component_Declaration
            | Iir_Kind_Type_Conversion
-           | Iir_Kind_Unit_Declaration =>
+           | Iir_Kind_Unit_Declaration
+           | Iir_Kind_Enumeration_Literal =>
             Error_Msg_Sem (+Name, "%n cannot be indexed or sliced", +Prefix);
             Res := Null_Iir;
 
@@ -4068,6 +4069,9 @@ package body Sem_Names is
            | Iir_Kind_Element_Attribute
            | Iir_Kind_Base_Attribute =>
             return Get_Type (Name);
+         when Iir_Kinds_Expression_Attribute =>
+            Error_Msg_Sem (+Name, "%n is not a valid type mark", +Name);
+            return Create_Error_Type (Name);
          when others =>
             if not Is_Error (Name) then
                Error_Msg_Sem
