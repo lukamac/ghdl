@@ -15,6 +15,7 @@
 #
 # ==============================================================================
 #	Copyright (C) 2015-2017 Patrick Lehmann - Dresden, Germany
+#	Copyright (C) 2017 Patrick Lehmann - Freiburg, Germany
 #	
 #	GHDL is free software; you can redistribute it and/or modify it under
 #	the terms of the GNU General Public License as published by the Free
@@ -79,7 +80,7 @@ param(
 	[string]$Source =							"",
 	# Set output directory name.
 	[string]$Output =							"",
-	# Set GHDL executable.
+	# Set GHDL binary directory.
 	[string]$GHDL =								""
 )
 
@@ -124,7 +125,7 @@ $SourceDirectory =			Get-SourceDirectory $Source ""
 $DestinationDirectory =	Get-DestinationDirectory $Output
 $GHDLBinary =						Get-GHDLBinary $GHDL
 
-# create "Altera" directory and change to it
+# create "uvvm" directory and change to it
 New-DestinationDirectory $DestinationDirectory
 cd $DestinationDirectory
 
