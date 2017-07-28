@@ -81,16 +81,6 @@ Write-Host "====================================================================
 Write-Host "GHDL for Windows - GHDL install script" -ForegroundColor Magenta
 Write-Host "================================================================================" -ForegroundColor Magenta
 
-if ($Help)
-{	Get-Help $MYINVOCATION.InvocationName -Detailed
-	Exit-CompileScript
-}
-
-$EnvPath_ContainerMapping = @{
-	Machine =	[EnvironmentVariableTarget]::Machine
-	User =		[EnvironmentVariableTarget]::User
-}
-
 function Exit-Script
 {	[CmdletBinding()]
 	param(
@@ -98,6 +88,16 @@ function Exit-Script
 	)
 	cd $Script_WorkingDir
 	exit $ExitCode
+}
+
+if ($Help)
+{	Get-Help $MYINVOCATION.InvocationName -Detailed
+	Exit-Script
+}
+
+$EnvPath_ContainerMapping = @{
+	Machine =	[EnvironmentVariableTarget]::Machine
+	User =		[EnvironmentVariableTarget]::User
 }
 
 # GitHub user:            https://github.com/mkropat
