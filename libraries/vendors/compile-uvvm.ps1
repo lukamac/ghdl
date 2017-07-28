@@ -57,14 +57,20 @@ param(
 	[switch]$UVVM_VCC_Framework =	$true,
 	# Compile all UVVM Verification IPs (VIPs).
 	[switch]$UVVM_VIP =								$true,
+		# Compile VIP: Avalon_MM
+		[switch]$UVVM_VIP_Avalon_MM =		$true,
 		# Compile VIP: AXI-Lite
 		[switch]$UVVM_VIP_AXI_Lite =		$true,
 		# Compile VIP: AXI-Stream
 		[switch]$UVVM_VIP_AXI_Stream =	$true,
+		# Compile VIP: GPIO
+		[switch]$UVVM_VIP_GPIO =				$true,
 		# Compile VIP: I2C
 		[switch]$UVVM_VIP_I2C =					$true,
 		# Compile VIP: SBI (Simple Byte Interface)
 		[switch]$UVVM_VIP_SBI =					$true,
+		# Compile VIP: SPI
+		[switch]$UVVM_VIP_SPI =					$true,
 		# Compile VIP: UART
 		[switch]$UVVM_VIP_UART =				$true,
 	
@@ -99,7 +105,8 @@ Import-Module $PSScriptRoot\shared.psm1 -Verbose:$false -Debug:$false -ArgumentL
 # Display help if no command was selected
 if ($Help -or (-not ($All -or $Clean -or
 										($UVVM -or			($UVVM_Utilities -or $UVVM_VVC_Framework)) -or
-										($UVVM_VIP -or	($UVVM_VIP_AXI_Lite -or $UVVM_VIP_AXI_Stream -or $UVVM_VIP_I2C -or $UVVM_VIP_SBI -or $UVVM_VIP_UART))		)))
+										($UVVM_VIP -or	($UVVM_VIP_Avalon_MM -or $UVVM_VIP_AXI_Lite -or $UVVM_VIP_AXI_Stream -or $UVVM_VIP_GPIO -or $UVVM_VIP_I2C -or
+										 $UVVM_VIP_SBI -or $UVVM_VIP_SPI -or $UVVM_VIP_UART))		)))
 {	Get-Help $MYINVOCATION.InvocationName -Detailed
 	Exit-CompileScript
 }
@@ -113,10 +120,13 @@ if ($UVVM)
 	$UVVM_VCC_Framework =		$true
 }
 if ($UVVM_VIP)
-{	$UVVM_VIP_AXI_Lite =		$true
+{	$UVVM_VIP_Avalon_MM =		$true
+	$UVVM_VIP_AXI_Lite =		$true
 	$UVVM_VIP_AXI_Stream =	$true
+	$UVVM_VIP_GPIO =				$true
 	$UVVM_VIP_I2C =					$true
 	$UVVM_VIP_SBI =					$true
+	$UVVM_VIP_SPI =					$true
 	$UVVM_VIP_UART =				$true
 }
 
@@ -171,6 +181,20 @@ $UVVM_VVC_Files = @(
 	"uvvm_vvc_framework\src\ti_uvvm_engine.vhd"
 )
 $VIP_Files = @{
+	"AvalonMM" = @{
+		"Variable" =	"UVVM_VIP_Avalon_MM";
+		"Library" =		"bitvis_vip_avalon_mm";
+		"Files" =			@(
+			"bitvis_vip_avalon_mm\src\avalon_mm_bfm_pkg.vhd",
+			"bitvis_vip_avalon_mm\src\vvc_cmd_pkg.vhd",
+			"uvvm_vvc_framework\src_target_dependent\td_target_support_pkg.vhd",
+			"uvvm_vvc_framework\src_target_dependent\td_vvc_framework_common_methods_pkg.vhd",
+			"bitvis_vip_avalon_mm\src\vvc_methods_pkg.vhd",
+			"uvvm_vvc_framework\src_target_dependent\td_queue_pkg.vhd",
+			"uvvm_vvc_framework\src_target_dependent\td_vvc_entity_support_pkg.vhd",
+			"bitvis_vip_avalon_mm\src\avalon_mm_vvc.vhd"
+		)
+	};
 	"AXILite" = @{
 		"Variable" =	"UVVM_VIP_AXI_Lite";
 		"Library" =		"bitvis_vip_axilite";
@@ -199,6 +223,20 @@ $VIP_Files = @{
 			"bitvis_vip_axistream\src\axistream_vvc.vhd"
 		)
 	};
+	"GPIO" = @{
+		"Variable" =	"UVVM_VIP_GPIO";
+		"Library" =		"bitvis_vip_gpio";
+		"Files" =			@(
+			"bitvis_vip_gpio\src\gpio_bfm_pkg.vhd",
+			"bitvis_vip_gpio\src\vvc_cmd_pkg.vhd",
+			"uvvm_vvc_framework\src_target_dependent\td_target_support_pkg.vhd",
+			"uvvm_vvc_framework\src_target_dependent\td_vvc_framework_common_methods_pkg.vhd",
+			"bitvis_vip_gpio\src\vvc_methods_pkg.vhd",
+			"uvvm_vvc_framework\src_target_dependent\td_queue_pkg.vhd",
+			"uvvm_vvc_framework\src_target_dependent\td_vvc_entity_support_pkg.vhd",
+			"bitvis_vip_gpio\src\gpio_vvc.vhd"
+		)
+	};
 	"I2C" = @{
 		"Variable" =	"UVVM_VIP_I2C";
 		"Library" =		"bitvis_vip_i2c";
@@ -225,6 +263,20 @@ $VIP_Files = @{
 			"uvvm_vvc_framework/src_target_dependent/td_queue_pkg.vhd",
 			"uvvm_vvc_framework/src_target_dependent/td_vvc_entity_support_pkg.vhd",
 			"bitvis_vip_sbi/src/sbi_vvc.vhd"
+		)
+	};
+	"SPI" = @{
+		"Variable" =	"UVVM_VIP_SPI";
+		"Library" =		"bitvis_vip_spi";
+		"Files" =			@(
+			"bitvis_vip_spi/src/spi_bfm_pkg.vhd",
+			"bitvis_vip_spi/src/vvc_cmd_pkg.vhd",
+			"uvvm_vvc_framework/src_target_dependent/td_target_support_pkg.vhd",
+			"uvvm_vvc_framework/src_target_dependent/td_vvc_framework_common_methods_pkg.vhd",
+			"bitvis_vip_spi/src/vvc_methods_pkg.vhd",
+			"uvvm_vvc_framework/src_target_dependent/td_queue_pkg.vhd",
+			"uvvm_vvc_framework/src_target_dependent/td_vvc_entity_support_pkg.vhd",
+			"bitvis_vip_spi/src/spi_vvc.vhd"
 		)
 	};
 	"UART" = @{
