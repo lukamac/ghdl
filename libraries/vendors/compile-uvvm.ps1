@@ -180,122 +180,29 @@ $UVVM_VVC_Files = @(
 	"uvvm_vvc_framework\src\ti_data_stack_pkg.vhd"
 	"uvvm_vvc_framework\src\ti_uvvm_engine.vhd"
 )
-$VIP_Files = @{
-	"AvalonMM" = @{
-		"Variable" =	"UVVM_VIP_Avalon_MM";
-		"Library" =		"bitvis_vip_avalon_mm";
-		"Files" =			@(
-			"bitvis_vip_avalon_mm\src\avalon_mm_bfm_pkg.vhd",
-			"bitvis_vip_avalon_mm\src\vvc_cmd_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_target_support_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_framework_common_methods_pkg.vhd",
-			"bitvis_vip_avalon_mm\src\vvc_methods_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_queue_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_entity_support_pkg.vhd",
-			"bitvis_vip_avalon_mm\src\avalon_mm_vvc.vhd"
-		)
-	};
-	"AXILite" = @{
-		"Variable" =	"UVVM_VIP_AXI_Lite";
-		"Library" =		"bitvis_vip_axilite";
-		"Files" =			@(
-			"bitvis_vip_axilite\src\axilite_bfm_pkg.vhd",
-			"bitvis_vip_axilite\src\vvc_cmd_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_target_support_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_framework_common_methods_pkg.vhd",
-			"bitvis_vip_axilite\src\vvc_methods_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_queue_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_entity_support_pkg.vhd",
-			"bitvis_vip_axilite\src\axilite_vvc.vhd"
-		)
-	};
-	"AXIStream" = @{
-		"Variable" =	"UVVM_VIP_AXI_Stream";
-		"Library" =		"bitvis_vip_axistream";
-		"Files" =			@(
-			"bitvis_vip_axistream\src\axistream_bfm_pkg.vhd",
-			"bitvis_vip_axistream\src\vvc_cmd_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_target_support_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_framework_common_methods_pkg.vhd",
-			"bitvis_vip_axistream\src\vvc_methods_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_queue_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_entity_support_pkg.vhd",
-			"bitvis_vip_axistream\src\axistream_vvc.vhd"
-		)
-	};
-	"GPIO" = @{
-		"Variable" =	"UVVM_VIP_GPIO";
-		"Library" =		"bitvis_vip_gpio";
-		"Files" =			@(
-			"bitvis_vip_gpio\src\gpio_bfm_pkg.vhd",
-			"bitvis_vip_gpio\src\vvc_cmd_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_target_support_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_framework_common_methods_pkg.vhd",
-			"bitvis_vip_gpio\src\vvc_methods_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_queue_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_entity_support_pkg.vhd",
-			"bitvis_vip_gpio\src\gpio_vvc.vhd"
-		)
-	};
-	"I2C" = @{
-		"Variable" =	"UVVM_VIP_I2C";
-		"Library" =		"bitvis_vip_i2c";
-		"Files" =			@(
-			"bitvis_vip_i2c\src\i2c_bfm_pkg.vhd",
-			"bitvis_vip_i2c\src\vvc_cmd_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_target_support_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_framework_common_methods_pkg.vhd",
-			"bitvis_vip_i2c\src\vvc_methods_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_queue_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_entity_support_pkg.vhd",
-			"bitvis_vip_i2c\src\i2c_vvc.vhd"
-		)
-	};
-	"SBI" = @{
-		"Variable" =	"UVVM_VIP_SBI";
-		"Library" =		"bitvis_vip_sbi";
-		"Files" =			@(
-			"bitvis_vip_sbi/src/sbi_bfm_pkg.vhd",
-			"bitvis_vip_sbi/src/vvc_cmd_pkg.vhd",
-			"uvvm_vvc_framework/src_target_dependent/td_target_support_pkg.vhd",
-			"uvvm_vvc_framework/src_target_dependent/td_vvc_framework_common_methods_pkg.vhd",
-			"bitvis_vip_sbi/src/vvc_methods_pkg.vhd",
-			"uvvm_vvc_framework/src_target_dependent/td_queue_pkg.vhd",
-			"uvvm_vvc_framework/src_target_dependent/td_vvc_entity_support_pkg.vhd",
-			"bitvis_vip_sbi/src/sbi_vvc.vhd"
-		)
-	};
-	"SPI" = @{
-		"Variable" =	"UVVM_VIP_SPI";
-		"Library" =		"bitvis_vip_spi";
-		"Files" =			@(
-			"bitvis_vip_spi/src/spi_bfm_pkg.vhd",
-			"bitvis_vip_spi/src/vvc_cmd_pkg.vhd",
-			"uvvm_vvc_framework/src_target_dependent/td_target_support_pkg.vhd",
-			"uvvm_vvc_framework/src_target_dependent/td_vvc_framework_common_methods_pkg.vhd",
-			"bitvis_vip_spi/src/vvc_methods_pkg.vhd",
-			"uvvm_vvc_framework/src_target_dependent/td_queue_pkg.vhd",
-			"uvvm_vvc_framework/src_target_dependent/td_vvc_entity_support_pkg.vhd",
-			"bitvis_vip_spi/src/spi_vvc.vhd"
-		)
-	};
-	"UART" = @{
-		"Variable" =	"UVVM_VIP_UART";
-		"Library" =		"bitvis_vip_uart";
-		"Files" =			@(
-			"bitvis_vip_uart\src\uart_bfm_pkg.vhd",
-			"bitvis_vip_uart\src\vvc_cmd_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_target_support_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_framework_common_methods_pkg.vhd",
-			"bitvis_vip_uart\src\vvc_methods_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_queue_pkg.vhd",
-			"uvvm_vvc_framework\src_target_dependent\td_vvc_entity_support_pkg.vhd",
-			"bitvis_vip_uart\src\uart_rx_vvc.vhd",
-			"bitvis_vip_uart\src\uart_tx_vvc.vhd",
-			"bitvis_vip_uart\src\uart_vvc.vhd"
-		)
+
+
+Write-Host "Reading VIP compile order files..." -ForegroundColor Yellow
+$VIP_Files = @{}
+foreach ($VIPDirectory in (Get-ChildItem -Path $SourceDirectory -Directory "*VIP*"))
+{	$VIPName =      $VIPDirectory.Name
+	$VIPVariable =  $VIPName.Substring(7).ToUpper().Replace("AXI", "AXI_")
+	
+	$EnableVerbose -and (Write-Host "  Found VIP: $VIPName"		-ForegroundColor Gray                                                                 ) | Out-Null
+	$EnableDebug -and   (Write-Host "    Reading compile order from '$SourceDirectory\$VIPName\script\compile_order.txt'" -ForegroundColor DarkGray	) | Out-Null
+
+	$VIPFiles = Get-Content "$SourceDirectory\$VIPName\script\compile_order.txt" | %{ Resolve-Path "$SourceDirectory\$VIPName\script\$_" }
+	if ($EnableDebug)
+	{	foreach ($File in $VIPFiles)
+		{	Write-Host "      $File" -ForegroundColor DarkGray }
 	}
+	$VIP_Files[$VIPName] = @{
+		"Variable" =	"UVVM_$VIPVariable";
+		"Library" =		$VIPName;
+		"Files" =			$VIPFiles
+	};
 }
+
 
 # UVVM packages
 # ==============================================================================
@@ -323,7 +230,7 @@ if ((-not $StopCompiling) -and $UVVM_VCC_Framework)
 foreach ($vip in $VIP_Files.Keys)
 {	if ((-not $StopCompiling) -and (Get-Variable $VIP_Files[$vip]["Variable"] -ValueOnly))
 	{	$Library =			$VIP_Files[$vip]["Library"]
-		$SourceFiles =	$VIP_Files[$vip]["Files"] | % { "$SourceDirectory\$_" }
+		$SourceFiles =	$VIP_Files[$vip]["Files"] #| % { "$SourceDirectory\$_" }
 
 		$ErrorCount += 0
 		Start-PackageCompilation $GHDLBinary $GHDLOptions $DestinationDirectory $Library $VHDLVersion $SourceFiles $SuppressWarnings $HaltOnError -Verbose:$EnableVerbose -Debug:$EnableDebug
