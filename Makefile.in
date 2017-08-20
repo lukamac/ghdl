@@ -36,6 +36,7 @@ llvm_be=@llvm_be@
 build_mode=@build_mode@
 enable_werror=@enable_werror@
 enable_checks=@enable_checks@
+enable_openieee=@enable_openieee@
 
 INSTALL_PROGRAM=install -m 755
 INSTALL_DATA=install -m 644
@@ -109,6 +110,7 @@ LIBDST_DIR:=$(libdirsuffix)
 LIBVHDL_FLAGS_TO_PASS=\
  LIBSRC_DIR="$(LIBSRC_DIR)" \
  LIBDST_DIR="$(LIBDST_DIR)" \
+ enable_openieee="$(enable_openieee)" \
  LN="$(LN)" CP="$(CP)" MKDIR="$(MKDIR)"
 
 all: Makefile all.$(backend)
@@ -406,10 +408,10 @@ install.vpi: all.vpi install.dirs
 LIBSRC_DIR:=$(srcdir)/libraries
 LIBDST_DIR:=$(libdirsuffix)
 
-VHDLLIB_SUBDIRS= src/std src/ieee src/vital95 src/vital2000 src/synopsys src/mentor src/ieee2008 \
+VHDLLIB_SUBDIRS= src/std src/ieee src/vital95 src/vital2000 src/synopsys src/mentor src/ieee2008 src/openieee \
   v87/std v87/ieee v87/synopsys \
   v93/std v93/ieee v93/mentor v93/synopsys \
-  v08/std v08/ieee v08/synopsys \
+  v08/std v08/ieee v08/synopsys
 
 install.dirs:
 #	Use -p to create parents and to avoid error if existing.
@@ -460,6 +462,16 @@ create-dirs: force
 	  $(MKDIR) -p $(LIBDST_DIR)/$$d; \
 	done
 
+# Remove non GPL compatible source files
+clean-pure-gpl:
+#       IEEE 1164 or vital libraries aren't GPL compatible
+	$(RM) -rf libraries/ieee libraries/ieee2008
+	$(RM) -rf libraries/vital95 libraries/vital2000
+#	Don't promote deprecated mentor libraries; synopsys one is ok
+	$(RM) -rf libraries/mentor
+#	The GNA testsuite contains open-source reproducer that may not be GPL.
+	$(RM) -rf testsuite/gna
+
 force:
 
-.PHONY: force clean distclean clean-c
+.PHONY: force clean distclean clean-c clean-pure-gpl

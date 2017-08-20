@@ -162,6 +162,7 @@ package body Sem_Names is
             when Iir_Kind_Enumeration_Literal
               | Iir_Kind_Function_Call
               | Iir_Kind_Indexed_Name
+              | Iir_Kind_Slice_Name
               | Iir_Kind_Selected_Element =>
                Add_Element (Res_List, Get_Type (Decl));
             when others =>
@@ -1910,7 +1911,6 @@ package body Sem_Names is
          R : Iir;
          Se : Iir;
       begin
-         --  FIXME: if not is_expr (sub_name) return.
          Name_Type := Get_Type (Sub_Name);
          if Kind_In (Name_Type, Iir_Kind_Access_Type_Definition,
                      Iir_Kind_Access_Subtype_Definition)
@@ -2069,7 +2069,14 @@ package body Sem_Names is
                   for I in Natural loop
                      El := Get_Nth_Element (Prefix_List, I);
                      exit when El = Null_Iir;
-                     Sem_As_Selected_Element (El);
+                     case Get_Kind (El) is
+                        when Iir_Kind_Procedure_Declaration =>
+                           --  A procedure cannot be the prefix of a selected
+                           --  element.
+                           null;
+                        when others =>
+                           Sem_As_Selected_Element (El);
+                     end case;
                   end loop;
                end if;
             end;
