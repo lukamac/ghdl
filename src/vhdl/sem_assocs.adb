@@ -324,8 +324,8 @@ package body Sem_Assocs is
                      --  conversion appears in either the formal part or the
                      --  actual part of an association element that associates
                      --  an actual signal with a formal signal parameter.
-                     if Get_In_Conversion (Assoc) /= Null_Iir
-                       or Get_Out_Conversion (Assoc) /= Null_Iir
+                     if Get_Actual_Conversion (Assoc) /= Null_Iir
+                       or Get_Formal_Conversion (Assoc) /= Null_Iir
                      then
                         Error_Msg_Sem
                           (+Assoc,
@@ -381,8 +381,8 @@ package body Sem_Assocs is
                      --  an actual with a formal parameter of a file type and
                      --  that association element contains a conversion
                      --  function or type conversion.
-                     if Get_In_Conversion (Assoc) /= Null_Iir
-                       or Get_Out_Conversion (Assoc) /= Null_Iir
+                     if Get_Actual_Conversion (Assoc) /= Null_Iir
+                       or Get_Formal_Conversion (Assoc) /= Null_Iir
                      then
                         Error_Msg_Sem (+Assoc, "conversion are not allowed "
                                          & "for file parameters");
@@ -568,8 +568,8 @@ package body Sem_Assocs is
 
       Ftype : constant Iir := Get_Type (Formal);
       Atype : constant Iir := Get_Type (Actual);
-      F_Conv : constant Iir := Get_Out_Conversion (Assoc);
-      A_Conv : constant Iir := Get_In_Conversion (Assoc);
+      F_Conv : constant Iir := Get_Formal_Conversion (Assoc);
+      A_Conv : constant Iir := Get_Actual_Conversion (Assoc);
       F2a_Type : Iir;
       A2f_Type : Iir;
    begin
@@ -1304,7 +1304,7 @@ package body Sem_Assocs is
       end if;
       Set_Type (Conv, Conv_Type);
 
-      Set_Out_Conversion (Assoc, Conv);
+      Set_Formal_Conversion (Assoc, Conv);
       Set_Formal (Assoc, Name);
 
       return Formal;
@@ -1312,8 +1312,8 @@ package body Sem_Assocs is
 
    procedure Revert_Formal_Conversion (Assoc : Iir; Saved_Assoc : Iir) is
    begin
-      Sem_Name_Clean (Get_Out_Conversion (Assoc));
-      Set_Out_Conversion (Assoc, Null_Iir);
+      Sem_Name_Clean (Get_Formal_Conversion (Assoc));
+      Set_Formal_Conversion (Assoc, Null_Iir);
       Sem_Name_Clean (Get_Formal (Assoc));
       Set_Formal (Assoc, Saved_Assoc);
    end Revert_Formal_Conversion;
@@ -1564,6 +1564,7 @@ package body Sem_Assocs is
             Assoc := Get_Parameter_Association_Chain (Func);
             Free_Iir (Assoc);
             Set_Parameter_Association_Chain (Func, Null_Iir);
+            Name_To_Method_Object (Func, Conv);
             return Func;
          when Iir_Kind_Type_Conversion =>
             return Func;
@@ -1600,6 +1601,7 @@ package body Sem_Assocs is
             Set_Type (Res, Get_Return_Type (Func));
             Set_Expr_Staticness (Res, None);
             Mark_Subprogram_Used (Func);
+            Name_To_Method_Object (Res, Conv);
          when Iir_Kind_Subtype_Declaration
            | Iir_Kind_Type_Declaration =>
             Res := Create_Iir (Iir_Kind_Type_Conversion);
@@ -2077,7 +2079,7 @@ package body Sem_Assocs is
          Set_Whole_Association_Flag (Assoc, Assoc_Kind = Whole);
          Formal := Get_Formal (Assoc);
 
-         Out_Conv := Get_Out_Conversion (Assoc);
+         Out_Conv := Get_Formal_Conversion (Assoc);
       else
          Set_Whole_Association_Flag (Assoc, True);
          Out_Conv := Null_Iir;
@@ -2213,7 +2215,7 @@ package body Sem_Assocs is
       --  The formal part of a named association element may be in the form of
       --  a function call [...] if and only if the formal is an interface
       --  object, the mode of the formal is OUT, INOUT, BUFFER or LINKAGE [...]
-      Set_Out_Conversion (Assoc, Out_Conv);
+      Set_Formal_Conversion (Assoc, Out_Conv);
       if Out_Conv /= Null_Iir
         and then Get_Mode (Inter) = Iir_In_Mode
       then
@@ -2225,7 +2227,7 @@ package body Sem_Assocs is
       --  The actual part of an association element may be in the form of a
       --  function call [...] if and only if the mode of the format is IN,
       --  INOUT or LINKAGE [...]
-      Set_In_Conversion (Assoc, In_Conv);
+      Set_Actual_Conversion (Assoc, In_Conv);
       if In_Conv /= Null_Iir
         and then Get_Mode (Inter) in Iir_Buffer_Mode .. Iir_Out_Mode
       then
@@ -2348,9 +2350,8 @@ package body Sem_Assocs is
          Inter := Interface_Chain;
          Pos := 0;
          while Inter /= Null_Iir loop
-            -- Formal assoc is not necessarily a simple name, it may
-            -- be a conversion function, or even an indexed or
-            -- selected name.
+            --  Formal assoc is not necessarily a simple name, it may be a
+            --  conversion function, or even an indexed or selected name.
             Sem_Association (Assoc, Inter, False, I_Match);
             if I_Match /= Not_Compatible then
                return;
@@ -2360,12 +2361,12 @@ package body Sem_Assocs is
          end loop;
       end Search_Interface;
 
-      Assoc: Iir;
-      Inter: Iir;
+      Assoc : Iir;
+      Inter : Iir;
 
       type Bool_Array is array (Natural range <>) of Param_Assoc_Type;
-      Nbr_Arg: constant Natural := Get_Chain_Length (Interface_Chain);
-      Arg_Matched: Bool_Array (0 .. Nbr_Arg - 1) := (others => None);
+      Nbr_Inter : constant Natural := Get_Chain_Length (Interface_Chain);
+      Inter_Matched : Bool_Array (0 .. Nbr_Inter - 1) := (others => None);
 
       Last_Individual : Iir;
       Has_Individual : Boolean;
@@ -2379,7 +2380,7 @@ package body Sem_Assocs is
       Match := Fully_Compatible;
       Has_Individual := False;
 
-      -- Loop on every assoc element, try to match it.
+      --  Loop on every assoc element, try to match it.
       Inter := Interface_Chain;
       Last_Individual := Null_Iir;
       Pos := 0;
@@ -2388,7 +2389,7 @@ package body Sem_Assocs is
       while Assoc /= Null_Iir loop
          Formal := Get_Formal (Assoc);
          if Formal = Null_Iir then
-            -- Positional argument.
+            --  Positional argument.
             if Pos < 0 then
                --  Positional after named argument.  Already caught by
                --  Sem_Actual_Of_Association_Chain (because it is called only
@@ -2397,7 +2398,7 @@ package body Sem_Assocs is
                Match := Not_Compatible;
                return;
             end if;
-            -- Try to match actual of ASSOC with the interface.
+            --  Try to match actual of ASSOC with the interface.
             if Inter = Null_Iir then
                if Finish then
                   Error_Msg_Sem (+Assoc, "too many actuals for %n", +Loc);
@@ -2410,16 +2411,16 @@ package body Sem_Assocs is
                return;
             end if;
             if Get_Kind (Assoc) = Iir_Kind_Association_Element_Open then
-               Arg_Matched (Pos) := Open;
+               Inter_Matched (Pos) := Open;
             else
-               Arg_Matched (Pos) := Whole;
+               Inter_Matched (Pos) := Whole;
             end if;
             Set_Whole_Association_Flag (Assoc, True);
             Inter := Get_Chain (Inter);
             Pos := Pos + 1;
          else
-            -- FIXME: directly search the formal if finish is true.
-            -- Find the Interface.
+            --  FIXME: directly search the formal if finish is true.
+            --  Find the Interface.
 
             --  Try as 'normal' or individual assoc.
             Search_Interface (Assoc, Inter, Pos);
@@ -2462,7 +2463,7 @@ package body Sem_Assocs is
                      if Finish then
                         --  Free the now unused parenthesis_name.
                         Free_Parenthesis_Name
-                          (Saved_Assoc, Get_Out_Conversion (Assoc));
+                          (Saved_Assoc, Get_Formal_Conversion (Assoc));
                      else
                         Revert_Formal_Conversion (Assoc, Saved_Assoc);
                      end if;
@@ -2489,12 +2490,12 @@ package body Sem_Assocs is
                if Get_Whole_Association_Flag (Assoc) then
                   --  Whole association.
                   Last_Individual := Null_Iir;
-                  if Arg_Matched (Pos) = None then
+                  if Inter_Matched (Pos) = None then
                      if Get_Kind (Assoc) = Iir_Kind_Association_Element_Open
                      then
-                        Arg_Matched (Pos) := Open;
+                        Inter_Matched (Pos) := Open;
                      else
-                        Arg_Matched (Pos) := Whole;
+                        Inter_Matched (Pos) := Whole;
                      end if;
                   else
                      if Finish then
@@ -2507,9 +2508,9 @@ package body Sem_Assocs is
                else
                   --  Individual association.
                   Has_Individual := True;
-                  if Arg_Matched (Pos) /= Whole then
+                  if Inter_Matched (Pos) /= Whole then
                      if Finish
-                       and then Arg_Matched (Pos) = Individual
+                       and then Inter_Matched (Pos) = Individual
                        and then Last_Individual /= Inter
                      then
                         Error_Msg_Sem
@@ -2520,7 +2521,7 @@ package body Sem_Assocs is
                         return;
                      end if;
                      Last_Individual := Inter;
-                     Arg_Matched (Pos) := Individual;
+                     Inter_Matched (Pos) := Individual;
                   else
                      if Finish then
                         Error_Msg_Sem
@@ -2535,7 +2536,7 @@ package body Sem_Assocs is
                   --  MATCH can be Not_Compatible due to errors.
                end if;
             else
-               -- Not found.
+               --  Not found.
                if Finish then
                   --  FIXME: display the name of subprg or component/entity.
                   --  FIXME: fetch the interface (for parenthesis_name).
@@ -2587,7 +2588,7 @@ package body Sem_Assocs is
       Inter := Interface_Chain;
       Pos := 0;
       while Inter /= Null_Iir loop
-         if Arg_Matched (Pos) <= Open then
+         if Inter_Matched (Pos) <= Open then
             case Get_Kind (Inter) is
                when Iir_Kinds_Interface_Object_Declaration =>
                   if Get_Default_Value (Inter) = Null_Iir then
