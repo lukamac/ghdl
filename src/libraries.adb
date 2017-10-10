@@ -42,9 +42,6 @@ package body Libraries is
    Libraries_Chain : Iir_Library_Declaration := Null_Iir;
    Libraries_Chain_Last : Iir_Library_Declaration := Null_Iir;
 
-   --  A location for any implicit declarations (such as library WORK).
-   Implicit_Location: Location_Type;
-
    --  Table of library paths.
    package Paths is new Tables
      (Table_Index_Type => Integer,
@@ -422,7 +419,7 @@ package body Libraries is
            ("  from " & Image (Dir) & Image (File_Id));
       end if;
 
-      File := Files_Map.Load_Source_File (Dir, File_Id);
+      File := Files_Map.Read_Source_File (Dir, File_Id);
       if File = No_Source_File_Entry then
          --  Not found.
          Set_Date (Library, Date_Valid'First);
@@ -623,15 +620,15 @@ package body Libraries is
    procedure Create_Virtual_Locations
    is
       use Files_Map;
-      Implicit_Source_File : Source_File_Entry;
+      Library_Source_File : Source_File_Entry;
       Command_Source_File : Source_File_Entry;
    begin
-      Implicit_Source_File := Create_Virtual_Source_File
-        (Get_Identifier ("*implicit*"));
+      Library_Source_File := Create_Virtual_Source_File
+        (Get_Identifier ("*libraries*"));
       Command_Source_File := Create_Virtual_Source_File
         (Get_Identifier ("*command line*"));
       Command_Line_Location := Source_File_To_Location (Command_Source_File);
-      Implicit_Location := Source_File_To_Location (Implicit_Source_File);
+      Library_Location := Source_File_To_Location (Library_Source_File);
    end Create_Virtual_Locations;
 
    -- Note: the scanner shouldn't be in use, since this procedure uses it.
@@ -653,7 +650,7 @@ package body Libraries is
       --  Create the library.
       Std_Library := Create_Iir (Iir_Kind_Library_Declaration);
       Set_Identifier (Std_Library, Std_Names.Name_Std);
-      Set_Location (Std_Library, Implicit_Location);
+      Set_Location (Std_Library, Library_Location);
       Libraries_Chain := Std_Library;
       Libraries_Chain_Last := Std_Library;
 
@@ -701,7 +698,7 @@ package body Libraries is
          Work_Library := Std_Library;
       else
          Work_Library := Create_Iir (Iir_Kind_Library_Declaration);
-         Set_Location (Work_Library, Implicit_Location);
+         Set_Location (Work_Library, Library_Location);
          Set_Library_Directory (Work_Library, Work_Directory);
 
          Set_Identifier (Work_Library, Work_Library_Name);
@@ -745,7 +742,7 @@ package body Libraries is
       end if;
 
       Library := Create_Iir (Iir_Kind_Library_Declaration);
-      Set_Location (Library, Loc);
+      Set_Location (Library, Library_Location);
       Set_Library_Directory (Library, Null_Identifier);
       Set_Identifier (Library, Ident);
       if Load_Library (Library) = False then
@@ -1637,7 +1634,7 @@ package body Libraries is
    is
       Fe : Source_File_Entry;
    begin
-      Fe := Files_Map.Load_Source_File (Local_Directory, File_Name);
+      Fe := Files_Map.Read_Source_File (Local_Directory, File_Name);
       if Fe = No_Source_File_Entry then
          Error_Msg_Option ("cannot open " & Image (File_Name));
          return Null_Iir;
@@ -1732,7 +1729,7 @@ package body Libraries is
 
       --  Load the file in memory.
       Design_File := Get_Design_File (Design_Unit);
-      Fe := Files_Map.Load_Source_File
+      Fe := Files_Map.Read_Source_File
         (Get_Design_File_Directory (Design_File),
          Get_Design_File_Filename (Design_File));
       if Fe = No_Source_File_Entry then

@@ -1950,6 +1950,7 @@ package body Sem_Names is
          Location_Copy (Se, Name);
          Set_Prefix (Se, R);
          Set_Type (Se, Get_Type (Rec_El));
+         Set_Identifier (Se, Suffix);
          Set_Selected_Element (Se, Rec_El);
          Set_Base_Name (Se, Get_Object_Prefix (R, False));
          Add_Result (Res, Se);
@@ -3801,7 +3802,8 @@ package body Sem_Names is
          when Iir_Kind_Simple_Name
            | Iir_Kind_Operator_Symbol =>
             Sem_Name_Clean_1 (Name);
-         when Iir_Kind_Parenthesis_Name =>
+         when Iir_Kind_Parenthesis_Name
+           | Iir_Kind_Selected_Name =>
             Sem_Name_Clean_1 (Get_Prefix (Name));
             Sem_Name_Clean_1 (Name);
          when others =>

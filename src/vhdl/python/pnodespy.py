@@ -6,18 +6,17 @@ import sys
 sys.path.append("../xtools")
 
 import pnodes
+import re
 
 libname = 'libghdl'
 
 
 def print_enum(name, vals):
-    n = 0
     print
     print
     print 'class {0}:'.format(name)
-    for k in vals:
+    for n, k in enumerate(vals):
         print '    {0} = {1}'.format(k, n)
-        n += 1
 
 
 def do_class_kinds():
@@ -67,15 +66,35 @@ def do_class_fields():
     print_enum('fields', [f.name for f in pnodes.funcs])
 
 
+def read_spec_enum(type_name, prefix, class_name):
+    """Read an enumeration declaration from iirs.ads"""
+    pat_decl = re.compile(r'   type {0} is$'.format(type_name))
+    pat_enum = re.compile(r'       {0}_(\w+),?(-- .*)?$'.format(prefix))
+    lr = pnodes.linereader(pnodes.spec_file)
+    while not pat_decl.match(lr.get()):
+        pass
+    toks = []
+    while True:
+        line = lr.get()
+        if line == '      );\n':
+            break
+        m = pat_enum.match(line)
+        if m:
+            toks.append(m.group(1))
+    print_enum(class_name, toks)
+
+
 def do_libghdl_iirs():
     print 'from libghdl import libghdl'
     do_class_kinds()
+    read_spec_enum('Iir_Mode', 'Iir', 'Iir_Mode')
     do_iirs_subprg()
 
 
 def do_libghdl_meta():
     print 'from libghdl import libghdl'
     print """
+
 
 # From nodes_meta
 get_fields_first = libghdl.nodes_meta__get_fields_first
@@ -94,9 +113,68 @@ get_field_attribute = libghdl.nodes_meta__get_field_attribute"""
     do_has_subprg()
 
 
+def do_libghdl_names():
+    pat_name_first = re.compile(
+        r'   Name_(\w+)\s+: constant Name_Id := (\d+);')
+    pat_name_def = re.compile(
+        r'   Name_(\w+)\s+:\s+constant Name_Id :=\s+Name_(\w+)( \+ (\d+))?;')
+    dict = {}
+    lr = pnodes.linereader('../std_names.ads')
+    while True:
+        line = lr.get()
+        m = pat_name_first.match(line)
+        if m:
+            name_def = m.group(1)
+            val = int(m.group(2))
+            dict[name_def] = val
+            res = [(name_def, val)]
+            break
+    val_max = 1
+    while True:
+        line = lr.get()
+        if line == 'end Std_Names;\n':
+            break
+        if line.endswith(':=\n'):
+            line = line.rstrip() + lr.get()
+        m = pat_name_def.match(line)
+        if m:
+            name_def = m.group(1)
+            name_ref = m.group(2)
+            val = m.group(3)
+            if not val:
+                val = 0
+            val_ref = dict.get(name_ref, None)
+            if not val_ref:
+                raise pnodes.ParseError(
+                    lr, "name {0} not found".format(name_ref))
+            val = val_ref + int(val)
+            val_max = max(val_max, val)
+            dict[name_def] = val
+            res.append((name_def, val))
+    print 'class Name:'
+    for n, v in res:
+        print '    {0} = {1}'.format(n, v)
+
+
+def do_libghdl_tokens():
+    pat_token = re.compile(r'       Tok_(\w+),?\s*(--.*)?$')
+    lr = pnodes.linereader('tokens.ads')
+    toks = []
+    while True:
+        line = lr.get()
+        if line == '      );\n':
+            break
+        m = pat_token.match(line)
+        if m:
+            toks.append(m.group(1))
+    print_enum("Tok", toks)
+
+
 pnodes.actions.update({'class-kinds': do_class_kinds,
                        'libghdl-iirs': do_libghdl_iirs,
-                       'libghdl-meta': do_libghdl_meta})
+                       'libghdl-meta': do_libghdl_meta,
+                       'libghdl-names': do_libghdl_names,
+                       'libghdl-tokens': do_libghdl_tokens})
 
 
 pnodes.main()
