@@ -362,16 +362,16 @@ package body Sem_Specs is
       end if;
    end Attribute_A_Decl;
 
-   --  IS_DESIGNATORS if true if the entity name list is a list of designators.
-   --  Return TRUE if an entity was attributed.
-   function Sem_Named_Entities
-     (Scope : Iir;
-      Name : Iir;
-      Attr : Iir_Attribute_Specification;
-      Is_Designators : Boolean;
-      Check_Defined : Boolean)
-     return Boolean
+   --  Return TRUE if a named entity was attributed.
+   function Sem_Named_Entities (Scope : Iir;
+                                Name : Iir;
+                                Attr : Iir_Attribute_Specification;
+                                Check_Defined : Boolean)
+                               return Boolean
    is
+      --  Name is set (ie neither ALL nor OTHERS).
+      Is_Designator : constant Boolean := Name /= Null_Iir;
+
       Res : Boolean;
 
       --  If declaration DECL matches then named entity ENT, apply attribute
@@ -381,16 +381,17 @@ package body Sem_Specs is
       is
          Ent_Id : constant Name_Id := Get_Identifier (Ent);
       begin
-         if (Name = Null_Iir or else Ent_Id = Get_Identifier (Name))
+         if (not Is_Designator or else Ent_Id = Get_Identifier (Name))
            and then Ent_Id /= Null_Identifier
          then
-            if Is_Designators then
+            if Is_Designator then
+               Set_Named_Entity (Name, Ent);
                Xref_Ref (Name, Ent);
             end if;
             if Get_Visible_Flag (Ent) = False then
                Error_Msg_Sem (+Attr, "%n is not yet visible", +Ent);
             else
-               Attribute_A_Decl (Decl, Attr, Is_Designators, Check_Defined);
+               Attribute_A_Decl (Decl, Attr, Is_Designator, Check_Defined);
                return True;
             end if;
          end if;
@@ -537,6 +538,7 @@ package body Sem_Specs is
          end loop;
       end Sem_Named_Entity_Chain;
    begin
+      --  The attribute specification was not yet applied.
       Res := False;
 
       --  LRM 5.1  Attribute specification
@@ -557,7 +559,7 @@ package body Sem_Specs is
       --  NOTE: therefore, ALL/OTHERS do not apply to named entities declared
       --  beyond the immediate declarative part, such as design unit or
       --  interfaces.
-      if Is_Designators then
+      if Is_Designator then
          --  LRM 5.1  Attribute specification
          --  An attribute specification for an attribute of a design unit
          --  (i.e. an entity declaration, an architecture, a configuration
@@ -761,7 +763,7 @@ package body Sem_Specs is
          --  specification applies to all named entities of the specified
          --  class that are declared in the immediatly enclosing
          --  declarative part.
-         Res := Sem_Named_Entities (Scope, Null_Iir, Spec, False, True);
+         Res := Sem_Named_Entities (Scope, Null_Iir, Spec, True);
          if Res = False and then Is_Warning_Enabled (Warnid_Specs) then
             Warning_Msg_Sem
               (Warnid_Specs, +Spec,
@@ -774,7 +776,7 @@ package body Sem_Specs is
          --  part, provided that each such entity is not explicitly named
          --  in the entity name list of a previous attribute specification
          --  for the given attribute.
-         Res := Sem_Named_Entities (Scope, Null_Iir, Spec, False, False);
+         Res := Sem_Named_Entities (Scope, Null_Iir, Spec, False);
          if Res = False and then Is_Warning_Enabled (Warnid_Specs) then
             Warning_Msg_Sem
               (Warnid_Specs, +Spec,
@@ -796,9 +798,10 @@ package body Sem_Specs is
                   --  LRM 5.1
                   --  It is an error if the class of those names is not the
                   --  same as that denoted by entity class.
-                  if not Sem_Named_Entities (Scope, El, Spec, True, True) then
-                     Error_Msg_Sem
-                       (+El, "no named entities %i in declarative part", +El);
+                  if not Sem_Named_Entities (Scope, El, Spec, True) then
+                     Error_Msg_Sem_Relaxed
+                       (El, Warnid_Specs,
+                        "no %i for attribute specification", (1 => +El));
                   end if;
                end if;
             end loop;
@@ -1053,6 +1056,7 @@ package body Sem_Specs is
                Arch_Name : Iir;
                Arch_Unit : Iir;
             begin
+               --  The entity.
                Entity_Name := Sem_Denoting_Name (Get_Entity_Name (Aspect));
                Set_Entity_Name (Aspect, Entity_Name);
                Entity := Get_Named_Entity (Entity_Name);
@@ -1070,8 +1074,13 @@ package body Sem_Specs is
                if Arch_Name /= Null_Iir then
                   Arch_Unit := Libraries.Find_Secondary_Unit
                     (Get_Design_Unit (Entity), Get_Identifier (Arch_Name));
-                  Set_Named_Entity (Arch_Name, Arch_Unit);
                   if Arch_Unit /= Null_Iir then
+                     --  The architecture is known.
+                     if Get_Date_State (Arch_Unit) >= Date_Parse then
+                        --  And loaded!
+                        Arch_Unit := Get_Library_Unit (Arch_Unit);
+                     end if;
+                     Set_Named_Entity (Arch_Name, Arch_Unit);
                      Xref_Ref (Arch_Name, Arch_Unit);
                   end if;
 

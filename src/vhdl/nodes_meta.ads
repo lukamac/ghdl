@@ -44,7 +44,6 @@ package Nodes_Meta is
       Type_Iir_Signal_Kind,
       Type_Iir_Staticness,
       Type_Int32,
-      Type_Location_Type,
       Type_Name_Id,
       Type_Number_Base_Type,
       Type_PSL_NFA,
@@ -355,7 +354,6 @@ package Nodes_Meta is
       Field_Simple_Name_Subtype,
       Field_Protected_Type_Body,
       Field_Protected_Type_Declaration,
-      Field_End_Location,
       Field_Use_Flag,
       Field_End_Has_Reserved_Id,
       Field_End_Has_Identifier,
@@ -367,6 +365,7 @@ package Nodes_Meta is
       Field_Has_Pure,
       Field_Has_Body,
       Field_Has_Parameter,
+      Field_Has_Component,
       Field_Has_Identifier_List,
       Field_Has_Mode,
       Field_Has_Class,
@@ -528,11 +527,6 @@ package Nodes_Meta is
       (N : Iir; F : Fields_Enum) return Int32;
    procedure Set_Int32
       (N : Iir; F : Fields_Enum; V: Int32);
-
-   function Get_Location_Type
-      (N : Iir; F : Fields_Enum) return Location_Type;
-   procedure Set_Location_Type
-      (N : Iir; F : Fields_Enum; V: Location_Type);
 
    function Get_Name_Id
       (N : Iir; F : Fields_Enum) return Name_Id;
@@ -881,7 +875,6 @@ package Nodes_Meta is
    function Has_Simple_Name_Subtype (K : Iir_Kind) return Boolean;
    function Has_Protected_Type_Body (K : Iir_Kind) return Boolean;
    function Has_Protected_Type_Declaration (K : Iir_Kind) return Boolean;
-   function Has_End_Location (K : Iir_Kind) return Boolean;
    function Has_Use_Flag (K : Iir_Kind) return Boolean;
    function Has_End_Has_Reserved_Id (K : Iir_Kind) return Boolean;
    function Has_End_Has_Identifier (K : Iir_Kind) return Boolean;
@@ -893,6 +886,7 @@ package Nodes_Meta is
    function Has_Has_Pure (K : Iir_Kind) return Boolean;
    function Has_Has_Body (K : Iir_Kind) return Boolean;
    function Has_Has_Parameter (K : Iir_Kind) return Boolean;
+   function Has_Has_Component (K : Iir_Kind) return Boolean;
    function Has_Has_Identifier_List (K : Iir_Kind) return Boolean;
    function Has_Has_Mode (K : Iir_Kind) return Boolean;
    function Has_Has_Class (K : Iir_Kind) return Boolean;

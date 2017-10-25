@@ -490,6 +490,7 @@ package body Sem_Decls is
    procedure Sem_Interface_Subprogram_Declaration (Inter : Iir) is
    begin
       Sem_Subprogram_Specification (Inter);
+      Sem_Scopes.Add_Name (Inter);
       Xref_Decl (Inter);
    end Sem_Interface_Subprogram_Declaration;
 
@@ -1253,6 +1254,7 @@ package body Sem_Decls is
                  Create_Iir (Iir_Kind_Interface_Variable_Declaration);
                Location_Copy (Var_Interface, Decl);
                Set_Identifier (Var_Interface, Std_Names.Name_P);
+               Set_Parent (Var_Interface, Deallocate_Proc);
                Set_Type (Var_Interface, Type_Definition);
                Set_Mode (Var_Interface, Iir_Inout_Mode);
                --Set_Purity_State (Deallocate_Proc, Impure);
@@ -2265,7 +2267,8 @@ package body Sem_Decls is
             return List = Null_Iir_List
               and then Get_Type (N_Entity)
               = Get_Type (Get_Return_Type_Mark (Sig));
-         when Iir_Kind_Function_Declaration =>
+         when Iir_Kind_Function_Declaration
+           | Iir_Kind_Interface_Function_Declaration =>
             --  LRM93 2.3.2  Signatures
             --  * if the reserved word RETURN is present, the subprogram is
             --    a function and the base type of the type mark following
@@ -2279,7 +2282,8 @@ package body Sem_Decls is
             then
                return False;
             end if;
-         when Iir_Kind_Procedure_Declaration =>
+         when Iir_Kind_Procedure_Declaration
+           | Iir_Kind_Interface_Procedure_Declaration =>
             --  LRM93 2.3.2  Signatures
             --  * [...] or the reserved word RETURN is absent and the
             --    subprogram is a procedure.
@@ -2546,8 +2550,8 @@ package body Sem_Decls is
       Id : Name_Id;
    begin
       case Get_Kind (N_Entity) is
-         when Iir_Kind_Function_Declaration
-           | Iir_Kind_Procedure_Declaration =>
+         when Iir_Kinds_Subprogram_Declaration
+           | Iir_Kinds_Interface_Subprogram_Declaration =>
             --  LRM93 4.3.3.2  Non-Object Aliases
             --  2.  A signature is required if the name denotes a subprogram
             --      (including an operator) or enumeration literal.

@@ -375,12 +375,15 @@ package body Configuration is
    begin
       case Get_Mode (Port) is
          when Iir_In_Mode =>
-            --  LRM 1.1.1.2 Ports
+            --  LRM93 1.1.1.2 Ports
             --  A port of mode IN may be unconnected or unassociated only if
             --  its declaration includes a default expression.
             if Get_Default_Value (Port) = Null_Iir then
                if Loc /= Null_Iir then
-                  Error_Msg_Elab (Loc, "IN %n must be connected", +Port);
+                  Error_Msg_Elab_Relaxed
+                    (Loc, Warnid_Port,
+                     "IN %n must be connected (or have a default value)",
+                     (1 => +Port));
                end if;
                return True;
             end if;
@@ -388,7 +391,7 @@ package body Configuration is
            | Iir_Inout_Mode
            | Iir_Buffer_Mode
            | Iir_Linkage_Mode =>
-            --  LRM 1.1.1.2  Ports
+            --  LRM93 1.1.1.2  Ports
             --  A port of any mode other than IN may be unconnected or
             --  unassociated as long as its type is not an unconstrained array
             --  type.
@@ -541,9 +544,11 @@ package body Configuration is
       if Bind = Null_Iir then
          if Is_Warning_Enabled (Warnid_Binding) then
             Inst := Get_First_Element (Get_Instantiation_List (Conf));
+            Inst := Strip_Denoting_Name (Inst);
             Warning_Msg_Elab
               (Warnid_Binding, Conf,
-               "%n is not bound", +Inst, Cont => True);
+               "%n of %n is not bound",
+               (+Inst, +Get_Instantiated_Unit (Inst)), Cont => True);
             Warning_Msg_Elab
               (Warnid_Binding, Current_Configuration,
                "(in %n)", +Current_Configuration);

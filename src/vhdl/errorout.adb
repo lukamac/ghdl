@@ -575,7 +575,7 @@ package body Errorout is
         and then (File /= No_Source_File_Entry and Line /= 0)
       then
          Put_Line (Extract_Expanded_Line (File, Line));
-         Put_Line ((1 .. Col => ' ') & '^');
+         Put_Line ((1 .. Col - 1 => ' ') & '^');
       end if;
    end Report_Msg;
 
@@ -762,6 +762,14 @@ package body Errorout is
    begin
       Error_Msg_Elab (Loc, Msg, Earg_Arr'(1 => Arg1));
    end Error_Msg_Elab;
+
+   procedure Error_Msg_Elab_Relaxed (Loc : Iir;
+                                     Id : Msgid_Warnings;
+                                     Msg : String;
+                                     Args : Earg_Arr := No_Eargs) is
+   begin
+      Error_Msg_Relaxed (Elaboration, Id, Msg, Loc, Args);
+   end Error_Msg_Elab_Relaxed;
 
    -- Disp a bug message.
    procedure Error_Internal (Expr: in Iir; Msg: String := "")
@@ -1551,9 +1559,12 @@ package body Errorout is
          "(" & Disp_Node (Callee) & " is defined here)", Callee);
    end Error_Pure;
 
-   procedure Error_Not_Match (Expr: Iir; A_Type: Iir)
-   is
+   procedure Error_Not_Match (Expr: Iir; A_Type: Iir) is
    begin
+      if Get_Kind (A_Type) = Iir_Kind_Error then
+         --  Cascade error message.
+         return;
+      end if;
       Error_Msg_Sem ("can't match " & Disp_Node (Expr) & " with type "
                      & Disp_Node (A_Type), Expr);
    end Error_Not_Match;

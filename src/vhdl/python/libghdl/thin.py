@@ -1,8 +1,8 @@
 from libghdl import libghdl
 from ctypes import (c_char_p, c_int32, c_int, c_bool, sizeof, c_void_p)
-import iirs
-import nodes_meta
-from nodes_meta import (Attr, types)
+import libghdl.iirs as iirs
+import libghdl.nodes_meta as nodes_meta
+from libghdl.nodes_meta import (Attr, types)
 # from libghdl_defs import (fields, Iir_Kind, types, Attr)
 
 assert sizeof(c_bool) == 1
@@ -31,6 +31,10 @@ Get_Nbr_Elements = libghdl.lists__get_nbr_elements
 
 Get_Nth_Element = libghdl.lists__get_nth_element
 
+Create_Iir_List = libghdl.lists__create_list
+
+Destroy_Iir_List = libghdl.lists__destroy_list
+
 # Files
 
 Location_To_File = libghdl.files_map__location_to_file
@@ -39,7 +43,7 @@ Location_File_To_Pos = libghdl.files_map__location_file_to_pos
 
 Location_File_To_Line = libghdl.files_map__location_file_to_line
 
-location_File_Line_To_Col = libghdl.files_map__location_file_line_to_col
+Location_File_Line_To_Col = libghdl.files_map__location_file_line_to_col
 
 Get_File_Name = libghdl.files_map__get_file_name
 
@@ -52,6 +56,8 @@ Read_Source_File = libghdl.files_map__read_source_file
 
 No_Source_File_Entry = 0
 
+No_Location = 0
+
 # Names
 
 Get_Name_Length = libghdl.name_table__get_name_length
@@ -61,14 +67,38 @@ Get_Name_Ptr.restype = c_char_p
 
 _Get_Identifier_With_Len = libghdl.name_table__get_identifier_with_len
 
-
 def Get_Identifier(s):
     return _Get_Identifier_With_Len(c_char_p(s), len(s))
+
+
+# Ieee
+
+class Ieee:
+    # Get value
+    Std_Logic_Type = c_int.in_dll(
+        libghdl, "ieee__std_logic_1164__std_logic_type")
+
+    # Get value
+    Std_Logic_Vector_Type = c_int.in_dll(
+        libghdl, "ieee__std_logic_1164__std_logic_vector_type")
+
+    # Get value
+    Rising_Edge = c_int.in_dll(libghdl, "ieee__std_logic_1164__rising_edge")
+
+    # Get value
+    Falling_Edge = c_int.in_dll(libghdl, "ieee__std_logic_1164__falling_edge")
+
+
+# Flags
+class Flags:
+    Flag_Elocations = c_bool.in_dll(libghdl, "flags__flag_elocations")
 
 
 # Scanner
 class Scanner:
     Set_File = libghdl.scanner__set_file
+
+    Close_File = libghdl.scanner__close_file
 
     Scan = libghdl.scanner__scan
 
@@ -85,9 +115,22 @@ class Scanner:
 
     Get_Position = libghdl.scanner__get_position
 
+    Current_Identifier = libghdl.scanner__current_identifier
+
 
 class Parse:
     Parse_Design_File = libghdl.parse__parse_design_file
+
+
+class Canon:
+    Flag_Concurrent_Stmts = c_bool.in_dll(
+        libghdl, "canon__canon_flag_concurrent_stmts");
+
+    Flag_Configurations = c_bool.in_dll(
+        libghdl, "canon__canon_flag_configurations");
+
+    Extract_Sequential_Statement_Chain_Sensitivity = \
+        libghdl.canon__canon_extract_sequential_statement_chain_sensitivity
 
 
 # std.standard
@@ -107,119 +150,30 @@ Add_Design_Unit_Into_Library = libghdl.libraries__add_design_unit_into_library
 
 Finish_Compilation = libghdl.libraries__finish_compilation
 
+# Use .value
 Library_Location = c_int32.in_dll(libghdl, "libraries__library_location")
 
-#
+# Use .value
+Work_Library = c_int32.in_dll(libghdl, "libraries__work_library")
+
+Purge_Design_File = libghdl.libraries__purge_design_file
+
+# Disp_Tree
 
 Disp_Iir = libghdl.disp_tree__disp_iir
 
+# Iirs_Utils
+
+class Iirs_Utils:
+    Strip_Denoting_Name = libghdl.iirs_utils__strip_denoting_name
+
+    Get_Entity = libghdl.iirs_utils__get_entity
+
+    Is_Second_Subprogram_Specification = \
+        libghdl.iirs_utils__is_second_subprogram_specification
+
+
 Null_Iir = 0
 Null_Iir_List = 0
-
-
-def _build_enum_image(cls):
-    d = [e for e in dir(cls) if e[0] != '_']
-    res = [None] * len(d)
-    for e in d:
-        res[getattr(cls, e)] = e
-    return res
-
-
-_fields_image = _build_enum_image(nodes_meta.fields)
-
-
-def fields_image(idx):
-    """String representation of field idx"""
-    return _fields_image[idx]
-
-
-_kind_image = _build_enum_image(iirs.Iir_Kind)
-
-
-def kind_image(k):
-    """String representation of Iir_Kind k"""
-    return _kind_image[k]
-
-
-_types_image = _build_enum_image(nodes_meta.types)
-
-
-def types_image(t):
-    """String representation of Nodes_Meta.Types t"""
-    return _types_image[t]
-
-
-_attr_image = _build_enum_image(nodes_meta.Attr)
-
-
-def attr_image(a):
-    """String representation of Nodes_Meta.Attr a"""
-    return _attr_image[a]
-
-
-def fields_iter(n):
-    """Iterate on fields of node n"""
-    if n == Null_Iir:
-        return
-    k = iirs.Get_Kind(n)
-    first = nodes_meta.get_fields_first(k)
-    last = nodes_meta.get_fields_last(k)
-    for i in range(first, last + 1):
-        yield nodes_meta.get_field_by_index(i)
-
-
-def chain_iter(n):
-    """Iterate of a chain headed by node n"""
-    while n != Null_Iir:
-        yield n
-        n = iirs.Get_Chain(n)
-
-
-def chain_to_list(n):
-    """Convert a chain headed by node n to a python list"""
-    return [e  for e in chain_iter(n)]
-
-
-def nodes_iter(n):
-    """Iterate of all nodes of n, including n.
-    Nodes are returned only once."""
-    if n == Null_Iir:
-        return
-#    print 'nodes_iter for {0}'.format(n)
-    yield n
-    chain_next = None
-    for f in fields_iter(n):
-        typ = nodes_meta.get_field_type(f)
-#        print ' {0}: field {1} (type: {2})'.format(
-#            n, fields_image(f), types_image(typ))
-        if typ == nodes_meta.types.Iir:
-            attr = nodes_meta.get_field_attribute(f)
-            if attr == Attr.ANone:
-                for n1 in nodes_iter(nodes_meta.Get_Iir(n, f)):
-                    yield n1
-            elif attr == Attr.Chain:
-                n2 = nodes_meta.Get_Iir(n, f)
-                while n2 != Null_Iir:
-                    for n1 in nodes_iter(n2):
-                        yield n1
-                    n2 = iirs.Get_Chain(n2)
-            elif attr == Attr.Maybe_Ref:
-                if not iirs.Get_Is_Ref(n, f):
-                    for n1 in nodes_iter(nodes_meta.Get_Iir(n, f)):
-                        yield n1
-        elif typ == types.Iir_List:
-            attr = nodes_meta.get_field_attribute(f)
-            if attr == Attr.ANone:
-                for n1 in list_iter(nodes_meta.Get_Iir_List(n, f)):
-                    yield n1
-    if chain_next:
-        for n1 in nodes_iter(chain_next):
-            yield n1
-
-
-def list_iter(lst):
-    """Iterate of all element of Iir_List lst."""
-    if lst == Null_Iir_List:
-        return
-    for i in range(Get_Nbr_Elements(lst)):
-        yield Get_Nth_Element(lst, i)
+Iir_List_Others = 1
+Iir_List_All = 2
