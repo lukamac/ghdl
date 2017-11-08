@@ -1079,9 +1079,9 @@ package body Trans.Rtis is
       end if;
 
       declare
-         Lit_List : constant Iir_List :=
+         Lit_List : constant Iir_Flist :=
            Get_Enumeration_Literal_List (Atype);
-         Nbr_Lit  : constant Integer := Get_Nbr_Elements (Lit_List);
+         Nbr_Lit  : constant Natural := Get_Nbr_Elements (Lit_List);
          Lit      : Iir;
 
          type Dnode_Array is array (Natural range <>) of O_Dnode;
@@ -1398,7 +1398,7 @@ package body Trans.Rtis is
    procedure Generate_Array_Type_Indexes
      (Atype : Iir; Res : out O_Dnode; Max_Depth : in out Rti_Depth_Type)
    is
-      List        : constant Iir_List := Get_Index_Subtype_List (Atype);
+      List        : constant Iir_Flist := Get_Index_Subtype_List (Atype);
       Nbr_Indexes : constant Natural := Get_Nbr_Elements (List);
       Index       : Iir;
       Tmp         : O_Dnode;
@@ -1456,7 +1456,7 @@ package body Trans.Rtis is
       Info      : Type_Info_Acc;
       Aggr      : O_Record_Aggr_List;
       Val       : O_Cnode;
-      List      : Iir_List;
+      List      : Iir_Flist;
       Arr       : O_Dnode;
       Element   : Iir;
       Name      : O_Dnode;
@@ -1619,7 +1619,7 @@ package body Trans.Rtis is
    procedure Generate_Record_Type_Definition (Atype : Iir)
    is
       Info      : constant Type_Info_Acc := Get_Info (Atype);
-      El_List   : Iir_List;
+      El_List   : Iir_Flist;
       El        : Iir;
       Prev      : Rti_Block;
       El_Arr    : O_Dnode;
@@ -1636,9 +1636,8 @@ package body Trans.Rtis is
 
       --  Generate elements.
       Push_Rti_Node (Prev, False);
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (El_List) loop
          El := Get_Nth_Element (El_List, I);
-         exit when El = Null_Iir;
          declare
             El_Type    : constant Iir := Get_Type (El);
             Field_Info : constant Field_Info_Acc := Get_Info (El);

@@ -1849,7 +1849,6 @@ package body Parse is
       Enum_Type := Create_Iir (Iir_Kind_Enumeration_Type_Definition);
       Set_Location (Enum_Type);
       Enum_List := Create_Iir_List;
-      Set_Enumeration_Literal_List (Enum_Type, Enum_List);
 
       --  LRM93 3.1.1
       --  The position number of the first listed enumeration literal is zero.
@@ -1906,6 +1905,8 @@ package body Parse is
 
       --  Skip ')'.
       Scan;
+
+      Set_Enumeration_Literal_List (Enum_Type, List_To_Flist (Enum_List));
 
       return Enum_Type;
    end Parse_Enumeration_Type_Definition;
@@ -2028,11 +2029,12 @@ package body Parse is
          --  Sem_Type will create the array type.
          Res_Type := Create_Iir (Iir_Kind_Array_Subtype_Definition);
          Set_Array_Element_Constraint (Res_Type, Element_Subtype);
-         Set_Index_Constraint_List (Res_Type, Index_List);
+         Set_Index_Constraint_List (Res_Type, List_To_Flist (Index_List));
       else
          Res_Type := Create_Iir (Iir_Kind_Array_Type_Definition);
          Set_Element_Subtype_Indication (Res_Type, Element_Subtype);
-         Set_Index_Subtype_Definition_List (Res_Type, Index_List);
+         Set_Index_Subtype_Definition_List (Res_Type,
+                                            List_To_Flist (Index_List));
       end if;
       Set_Location (Res_Type, Loc);
 
@@ -2153,7 +2155,6 @@ package body Parse is
       Res := Create_Iir (Iir_Kind_Record_Type_Definition);
       Set_Location (Res);
       El_List := Create_Iir_List;
-      Set_Elements_Declaration_List (Res, El_List);
 
       --  Skip 'record'
       Scan;
@@ -2199,6 +2200,8 @@ package body Parse is
          Scan_Semi_Colon ("element declaration");
          exit when Current_Token = Tok_End;
       end loop;
+
+      Set_Elements_Declaration_List (Res, List_To_Flist (El_List));
 
       --  Skip 'end'
       Scan_Expect (Tok_Record);
@@ -2637,7 +2640,6 @@ package body Parse is
          Scan;
       else
          Index_List := Create_Iir_List;
-         Set_Index_Constraint_List (Def, Index_List);
          --  index_constraint ::= (discrete_range {, discrete_range} )
          loop
             El := Parse_Discrete_Range;
@@ -2649,6 +2651,7 @@ package body Parse is
             Expect (Tok_Comma);
             Scan;
          end loop;
+         Set_Index_Constraint_List (Def, List_To_Flist (Index_List));
       end if;
 
       --  Eat ')'
@@ -3497,12 +3500,14 @@ package body Parse is
       --  List of type_marks.
       if Current_Token = Tok_Identifier then
          List := Create_Iir_List;
-         Set_Type_Marks_List (Res, List);
          loop
             Append_Element (List, Parse_Type_Mark (Check_Paren => True));
             exit when Current_Token /= Tok_Comma;
+
+            --  Skip ','.
             Scan;
          end loop;
+         Set_Type_Marks_List (Res, List_To_Flist (List));
       end if;
 
       if Current_Token = Tok_Return then
@@ -3870,20 +3875,30 @@ package body Parse is
                Res := Create_Iir (Iir_Kind_Group_Declaration);
                Set_Location (Res, Loc);
                Set_Identifier (Res, Ident);
+
+               --  Skip ':'.
                Scan;
+
                Set_Group_Template_Name
                  (Res, Parse_Name (Allow_Indexes => False));
+
+               --  Skip '('.
                Expect (Tok_Left_Paren);
                Scan;
                List := Create_Iir_List;
-               Set_Group_Constituent_List (Res, List);
                loop
                   Append_Element (List, Parse_Name (Allow_Indexes => False));
                   exit when Current_Token = Tok_Right_Paren;
+
+                  --  Skip ','.
                   Expect (Tok_Comma);
                   Scan;
                end loop;
+
+               --  Skip ')'.
                Scan_Expect (Tok_Semi_Colon);
+
+               Set_Group_Constituent_List (Res, List_To_Flist (List));
                return Res;
             end;
          when others =>

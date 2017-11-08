@@ -400,9 +400,9 @@ package body Trans.Chap8 is
                  (Get_Ortho_Type (Base_Type, Mode_Value), Integer_64 (Val)));
          when Iir_Kind_Enumeration_Type_Definition =>
             declare
-               List : Iir_List;
+               List : constant Iir_Flist :=
+                 Get_Enumeration_Literal_List (Base_Type);
             begin
-               List := Get_Enumeration_Literal_List (Base_Type);
                --  FIXME: what about type E is ('T') ??
                if Natural (Val) > Get_Nbr_Elements (List) then
                   raise Internal_Error;
@@ -907,12 +907,12 @@ package body Trans.Chap8 is
    procedure Translate_Variable_Rec_Aggr
      (Targ : Iir_Aggregate; Targ_Type : Iir; Val : Mnode)
    is
+      El_List : constant Iir_Flist :=
+        Get_Elements_Declaration_List (Get_Base_Type (Targ_Type));
       Aggr_El  : Iir;
-      El_List  : Iir_List;
       El_Index : Natural;
       Elem     : Iir;
    begin
-      El_List := Get_Elements_Declaration_List (Get_Base_Type (Targ_Type));
       El_Index := 0;
       Aggr_El := Get_Association_Choices_Chain (Targ);
       while Aggr_El /= Null_Iir loop
@@ -2734,9 +2734,12 @@ package body Trans.Chap8 is
                           (M2Lp (Chap3.Get_Composite_Bounds (Param)),
                            M2Addr (Chap3.Get_Composite_Bounds (Params (Pos))));
 
-                        --  Allocate the base.
-                        Chap3.Allocate_Unbounded_Composite_Base
-                          (Alloc, Param, Formal_Type);
+                        if Get_Type_Staticness (Actual_Type) >= Globally then
+                           --  Allocate the base (only if the bounds are
+                           --  known).
+                           Chap3.Allocate_Unbounded_Composite_Base
+                             (Alloc, Param, Formal_Type);
+                        end if;
 
                         Saved_Sig (Pos) := Param;
                      end if;
@@ -3904,7 +3907,7 @@ package body Trans.Chap8 is
       Idx         : O_Dnode;
       Dim         : Natural)
    is
-      Index_List : constant Iir_List :=
+      Index_List : constant Iir_Flist :=
         Get_Index_Subtype_List (Target_Type);
       Nbr_Dim    : constant Natural := Get_Nbr_Elements (Index_List);
       Sub_Aggr   : Mnode;
@@ -3940,13 +3943,12 @@ package body Trans.Chap8 is
    procedure Translate_Signal_Target_Record_Aggr
      (Aggr : Mnode; Target : Iir; Target_Type : Iir)
    is
+      El_List : constant Iir_Flist :=
+        Get_Elements_Declaration_List (Get_Base_Type (Target_Type));
       Aggr_El  : Iir;
-      El_List  : Iir_List;
       El_Index : Natural;
       Element  : Iir_Element_Declaration;
    begin
-      El_List := Get_Elements_Declaration_List
-        (Get_Base_Type (Target_Type));
       El_Index := 0;
       Aggr_El := Get_Association_Choices_Chain (Target);
       while Aggr_El /= Null_Iir loop

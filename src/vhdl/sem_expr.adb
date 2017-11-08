@@ -1944,7 +1944,7 @@ package body Sem_Expr is
          --  be visible at the place of the string literal.
 
          --  Character C is not visible...
-         if Find_Name_In_List (Get_Enumeration_Literal_List (Etype), Id)
+         if Find_Name_In_Flist (Get_Enumeration_Literal_List (Etype), Id)
            = Null_Iir
          then
             --  ... because it is not defined.
@@ -2794,7 +2794,8 @@ package body Sem_Expr is
      return boolean
    is
       Base_Type : constant Iir := Get_Base_Type (A_Type);
-      El_List : constant Iir_List := Get_Elements_Declaration_List (Base_Type);
+      El_List : constant Iir_Flist :=
+        Get_Elements_Declaration_List (Base_Type);
 
       --  Type of the element.
       El_Type : Iir;
@@ -2843,7 +2844,7 @@ package body Sem_Expr is
             Ok := False;
             return Ass;
          end if;
-         Aggr_El := Find_Name_In_List (El_List, Get_Identifier (Expr));
+         Aggr_El := Find_Name_In_Flist (El_List, Get_Identifier (Expr));
          if Aggr_El = Null_Iir then
             Error_Msg_Sem (+Ass, "record has no such element %n", +Ass);
             Ok := False;
@@ -3025,7 +3026,7 @@ package body Sem_Expr is
                                          Constrained : Boolean;
                                          Dim: Natural)
    is
-      Index_List : constant Iir_List := Get_Index_Subtype_List (A_Type);
+      Index_List : constant Iir_Flist := Get_Index_Subtype_List (A_Type);
 
       --  Type of the index (this is also the type of the choices).
       Index_Type : constant Iir := Get_Index_Type (Index_List, Dim - 1);
@@ -3419,7 +3420,7 @@ package body Sem_Expr is
    is
       A_Subtype: Iir;
       Base_Type : Iir;
-      Index_List : constant Iir_List := Get_Index_Subtype_List (Aggr_Type);
+      Index_List : constant Iir_Flist := Get_Index_Subtype_List (Aggr_Type);
       Nbr_Dim : constant Natural := Get_Nbr_Elements (Index_List);
       Infos : Array_Aggr_Info_Arr (1 .. Nbr_Dim);
       Aggr_Constrained : Boolean;
@@ -3451,8 +3452,8 @@ package body Sem_Expr is
          A_Subtype := Create_Array_Subtype (Base_Type, Get_Location (Aggr));
          Type_Staticness := Get_Type_Staticness (A_Subtype);
          for I in Infos'Range loop
-            Append_Element (Get_Index_Subtype_List (A_Subtype),
-                            Infos (I).Index_Subtype);
+            Set_Nth_Element (Get_Index_Subtype_List (A_Subtype), I - 1,
+                             Infos (I).Index_Subtype);
             Type_Staticness := Min
               (Type_Staticness, Get_Type_Staticness (Infos (I).Index_Subtype));
          end loop;

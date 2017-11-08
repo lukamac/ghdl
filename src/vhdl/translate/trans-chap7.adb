@@ -170,7 +170,7 @@ package body Trans.Chap7 is
    is
       use Name_Table;
 
-      Literal_List : constant Iir_List :=
+      Literal_List : constant Iir_Flist :=
         Get_Enumeration_Literal_List (Get_Base_Type (El_Type));
       Len          : constant Nat32 := Get_String_Length (Str);
       Id           : constant String8_Id := Get_String8_Id (Str);
@@ -251,7 +251,7 @@ package body Trans.Chap7 is
    function Translate_Static_Simple_Aggregate (Aggr : Iir) return O_Cnode
    is
       Aggr_Type : constant Iir := Get_Type (Aggr);
-      El_List   : constant Iir_List := Get_Simple_Aggregate_List (Aggr);
+      El_List   : constant Iir_Flist := Get_Simple_Aggregate_List (Aggr);
       El_Type   : constant Iir := Get_Element_Subtype (Aggr_Type);
       El        : Iir;
       List      : O_Array_Aggr_List;
@@ -260,9 +260,8 @@ package body Trans.Chap7 is
       Chap3.Translate_Anonymous_Type_Definition (Aggr_Type);
       Start_Array_Aggr (List, Get_Ortho_Type (Aggr_Type, Mode_Value));
 
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (El_List) loop
          El := Get_Nth_Element (El_List, I);
-         exit when El = Null_Iir;
          New_Array_Aggr_El
            (List, Translate_Static_Expression (El, El_Type));
       end loop;
@@ -422,7 +421,8 @@ package body Trans.Chap7 is
    is
       use Name_Table;
 
-      Literal_List : Iir_List;
+      Literal_List : constant Iir_Flist :=
+        Get_Enumeration_Literal_List (Character_Type_Definition);
       Lit          : Iir;
       List         : O_Array_Aggr_List;
       Res          : O_Cnode;
@@ -431,7 +431,6 @@ package body Trans.Chap7 is
 
       Start_Array_Aggr (List, Get_Ortho_Type (Str_Type, Mode_Value));
 
-      Literal_List := Get_Enumeration_Literal_List (Character_Type_Definition);
       Image (Str_Ident);
       for I in 1 .. Nam_Length loop
          Lit := Get_Nth_Element (Literal_List,
@@ -507,10 +506,10 @@ package body Trans.Chap7 is
          when Iir_Kind_Enumeration_Literal =>
             declare
                Enum_Type : constant Iir := Get_Base_Type (Get_Type (Expr));
-               Lit_List : Iir_List;
+               Lit_List : constant Iir_Flist :=
+                 Get_Enumeration_Literal_List (Enum_Type);
                Enum : Iir;
             begin
-               Lit_List := Get_Enumeration_Literal_List (Enum_Type);
                Enum := Get_Nth_Element
                  (Lit_List, Natural (Get_Enum_Pos (Expr)));
                return Get_Ortho_Expr (Enum);
@@ -797,7 +796,7 @@ package body Trans.Chap7 is
          when Iir_Kind_Array_Type_Definition
            | Iir_Kind_Array_Subtype_Definition =>
             declare
-               Expr_Indexes  : constant Iir_List :=
+               Expr_Indexes  : constant Iir_Flist :=
                  Get_Index_Subtype_List (Expr_Type);
             begin
                for I in 1 .. Get_Nbr_Elements (Expr_Indexes) loop
@@ -816,16 +815,15 @@ package body Trans.Chap7 is
          when Iir_Kind_Record_Type_Definition
            | Iir_Kind_Record_Subtype_Definition =>
             declare
-               Expr_Els : constant Iir_List :=
+               Expr_Els : constant Iir_Flist :=
                  Get_Elements_Declaration_List (Expr_Type);
-               Atype_Els : constant Iir_List :=
+               Atype_Els : constant Iir_Flist :=
                  Get_Elements_Declaration_List (Atype);
                Expr_El, Atype_El : Iir;
                Expr_El_Type, Atype_El_Type : Iir;
             begin
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (Expr_Els) loop
                   Expr_El := Get_Nth_Element (Expr_Els, I);
-                  exit when Expr_El = Null_Iir;
                   Atype_El := Get_Nth_Element (Atype_Els, I);
                   Expr_El_Type := Get_Type (Expr_El);
                   Atype_El_Type := Get_Type (Atype_El);
@@ -1970,7 +1968,7 @@ package body Trans.Chap7 is
      (Op : ON_Op_Kind; Operand : Iir; Res_Type : Iir) return O_Enode
    is
       Arr_Type  : constant Iir := Get_Type (Operand);
-      Enums     : constant Iir_List :=
+      Enums     : constant Iir_Flist :=
         Get_Enumeration_Literal_List (Get_Base_Type (Res_Type));
       Init_Enum : Iir;
 
@@ -2075,7 +2073,7 @@ package body Trans.Chap7 is
    function Translate_Predefined_TF_Edge (Is_Rising : Boolean; Left : Iir)
                                          return O_Enode
    is
-      Enums : constant Iir_List :=
+      Enums : constant Iir_Flist :=
         Get_Enumeration_Literal_List (Get_Base_Type (Get_Type (Left)));
       Sig  : Mnode;
       Val  : Mnode;
@@ -2889,7 +2887,7 @@ package body Trans.Chap7 is
       Dim        : Natural;
       Var_Index  : O_Dnode)
    is
-      Index_List : Iir_List;
+      Index_List : Iir_Flist;
       Expr_Type  : Iir;
       Final      : Boolean;
 
@@ -3140,7 +3138,7 @@ package body Trans.Chap7 is
       Aggr_Type      : constant Iir := Get_Type (Aggr);
       Aggr_Base_Type : constant Iir_Record_Type_Definition :=
         Get_Base_Type (Aggr_Type);
-      El_List        : constant Iir_List :=
+      El_List        : constant Iir_Flist :=
         Get_Elements_Declaration_List (Aggr_Base_Type);
       El_Index       : Natural;
       Nbr_El         : constant Natural := Get_Nbr_Elements (El_List);
@@ -3199,9 +3197,9 @@ package body Trans.Chap7 is
      (Target : Mnode; Target_Type : Iir; Aggr : Iir)
    is
       Aggr_Type       : constant Iir := Get_Type (Aggr);
-      Index_List      : constant Iir_List :=
+      Index_List      : constant Iir_Flist :=
         Get_Index_Subtype_List (Aggr_Type);
-      Targ_Index_List : constant Iir_List :=
+      Targ_Index_List : constant Iir_Flist :=
         Get_Index_Subtype_List (Target_Type);
 
       Aggr_Info : Iir_Aggregate_Info;
@@ -3255,9 +3253,8 @@ package body Trans.Chap7 is
       Aggr_Info := Get_Aggregate_Info (Aggr);
 
       --  Check type
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (Index_List) loop
          Subaggr_Type := Get_Index_Type (Index_List, I);
-         exit when Subaggr_Type = Null_Iir;
          Subtarg_Type := Get_Index_Type (Targ_Index_List, I);
 
          Bt := Get_Base_Type (Subaggr_Type);
@@ -3633,23 +3630,22 @@ package body Trans.Chap7 is
    procedure Translate_Type_Conversion_Bounds
      (Res : Mnode; Src : Mnode; Res_Type : Iir; Src_Type : Iir; Loc : Iir)
    is
-      Res_Indexes  : constant Iir_List := Get_Index_Subtype_List (Res_Type);
-      Src_Indexes : constant Iir_List := Get_Index_Subtype_List (Src_Type);
+      Res_Indexes  : constant Iir_Flist := Get_Index_Subtype_List (Res_Type);
+      Src_Indexes : constant Iir_Flist := Get_Index_Subtype_List (Src_Type);
       Res_Base_Type     : constant Iir := Get_Base_Type (Res_Type);
       Src_Base_Type    : constant Iir := Get_Base_Type (Src_Type);
-      Res_Base_Indexes  : constant Iir_List :=
+      Res_Base_Indexes  : constant Iir_Flist :=
         Get_Index_Subtype_List (Res_Base_Type);
-      Src_Base_Indexes : constant Iir_List :=
+      Src_Base_Indexes : constant Iir_Flist :=
         Get_Index_Subtype_List (Src_Base_Type);
 
       R_El              : Iir;
       S_El              : Iir;
    begin
       --  Convert bounds.
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (Src_Indexes) loop
          R_El := Get_Index_Type (Res_Indexes, I);
          S_El := Get_Index_Type (Src_Indexes, I);
-         exit when S_El = Null_Iir;
          declare
             Rb_Ptr          : Mnode;
             Sb_Ptr          : Mnode;
@@ -4712,7 +4708,7 @@ package body Trans.Chap7 is
       Info           : constant Type_Info_Acc := Get_Info (Arr_Type);
       F_Info         : constant Operator_Info_Acc := Get_Info (Subprg);
       L, R           : Mnode;
-      Indexes        : constant Iir_List := Get_Index_Subtype_List (Arr_Type);
+      Indexes        : constant Iir_Flist := Get_Index_Subtype_List (Arr_Type);
       Nbr_Indexes    : constant Natural := Get_Nbr_Elements (Indexes);
       If_Blk         : O_If_Block;
       Var_I          : O_Dnode;
@@ -4811,7 +4807,7 @@ package body Trans.Chap7 is
       If_Blk         : O_If_Block;
       Le, Re         : Mnode;
 
-      El_List : Iir_List;
+      El_List : Iir_Flist;
       El      : Iir_Element_Declaration;
    begin
       if Global_Storage = O_Storage_External then
@@ -4826,9 +4822,8 @@ package body Trans.Chap7 is
 
       --   Compare each element.
       El_List := Get_Elements_Declaration_List (Rec_Type);
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (El_List) loop
          El := Get_Nth_Element (El_List, I);
-         exit when El = Null_Iir;
          Open_Temp;
          Le := Chap6.Translate_Selected_Element (L, El);
          Re := Chap6.Translate_Selected_Element (R, El);
@@ -5213,12 +5208,12 @@ package body Trans.Chap7 is
          case Shift is
             when Sh_Logical =>
                declare
-                  Enum_List : Iir_List;
-               begin
-                  Enum_List := Get_Enumeration_Literal_List
+                  Enum_List : constant Iir_Flist :=
+                    Get_Enumeration_Literal_List
                     (Get_Base_Type (Get_Element_Subtype (Arr_Type)));
+               begin
                   Tmp := New_Lit
-                    (Get_Ortho_Expr (Get_First_Element (Enum_List)));
+                    (Get_Ortho_Expr (Get_Nth_Element (Enum_List, 0)));
                end;
             when Sh_Arith =>
                Tmp := New_Obj_Value (Var_E);
@@ -5521,17 +5516,15 @@ package body Trans.Chap7 is
                New_Procedure_Call (Assocs);
             when Type_Mode_Record =>
                declare
-                  El_List : Iir_List;
+                  El_List : constant Iir_Flist :=
+                    Get_Elements_Declaration_List (Get_Base_Type (Val_Type));
                   El      : Iir;
                   Val1    : Mnode;
                begin
                   Open_Temp;
                   Val1 := Stabilize (Val);
-                  El_List := Get_Elements_Declaration_List
-                    (Get_Base_Type (Val_Type));
-                  for I in Natural loop
+                  for I in Flist_First .. Flist_Last (El_List) loop
                      El := Get_Nth_Element (El_List, I);
-                     exit when El = Null_Iir;
                      Translate_Rw
                        (Chap6.Translate_Selected_Element (Val1, El),
                         Get_Type (El), Proc);

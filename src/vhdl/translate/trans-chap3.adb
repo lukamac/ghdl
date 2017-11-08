@@ -221,7 +221,7 @@ package body Trans.Chap3 is
    procedure Translate_Enumeration_Type
      (Def : Iir_Enumeration_Type_Definition)
    is
-      El_List  : constant Iir_List := Get_Enumeration_Literal_List (Def);
+      El_List  : constant Iir_Flist := Get_Enumeration_Literal_List (Def);
       Nbr      : constant Natural := Get_Nbr_Elements (El_List);
       Info     : constant Type_Info_Acc := Get_Info (Def);
       El       : Iir_Enumeration_Literal;
@@ -236,9 +236,8 @@ package body Trans.Chap3 is
          Size := 32;
       end if;
       Start_Enum_Type (Constr, Size);
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (El_List) loop
          El := Get_Nth_Element (El_List, I);
-         exit when El = Null_Iir;
 
          Lit_Name := Translate_Enumeration_Literal (El);
          New_Enum_Literal (Constr, Lit_Name, Val);
@@ -259,7 +258,7 @@ package body Trans.Chap3 is
    procedure Translate_Bool_Type (Def : Iir_Enumeration_Type_Definition)
    is
       Info    : constant Type_Info_Acc := Get_Info (Def);
-      El_List : constant Iir_List := Get_Enumeration_Literal_List (Def);
+      El_List : constant Iir_Flist := Get_Enumeration_Literal_List (Def);
       pragma Assert (Get_Nbr_Elements (El_List) = 2);
 
       False_Lit : constant Iir := Get_Nth_Element (El_List, 0);
@@ -409,15 +408,14 @@ package body Trans.Chap3 is
          when Iir_Kind_Record_Type_Definition
             | Iir_Kind_Record_Subtype_Definition =>
             declare
+               List : constant Iir_Flist :=
+                 Get_Elements_Declaration_List (Get_Base_Type (Def));
                El   : Iir;
                Res  : Natural;
-               List : Iir_List;
             begin
                Res := 2;
-               List := Get_Elements_Declaration_List (Get_Base_Type (Def));
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (List) loop
                   El := Get_Nth_Element (List, I);
-                  exit when El = Null_Iir;
                   Res := Res + Get_File_Signature_Length (Get_Type (El));
                end loop;
                return Res;
@@ -448,15 +446,14 @@ package body Trans.Chap3 is
          when Iir_Kind_Record_Type_Definition
             | Iir_Kind_Record_Subtype_Definition =>
             declare
+               List : constant Iir_Flist :=
+                 Get_Elements_Declaration_List (Get_Base_Type (Def));
                El   : Iir;
-               List : Iir_List;
             begin
                Res (Off) := '<';
                Off := Off + 1;
-               List := Get_Elements_Declaration_List (Get_Base_Type (Def));
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (List) loop
                   El := Get_Nth_Element (List, I);
-                  exit when El = Null_Iir;
                   Get_File_Signature (Get_Type (El), Res, Off);
                end loop;
                Res (Off) := '>';
@@ -564,13 +561,12 @@ package body Trans.Chap3 is
       case Get_Kind (Def) is
          when Iir_Kind_Array_Subtype_Definition =>
             declare
-               Indexes_List : constant Iir_List :=
+               Indexes_List : constant Iir_Flist :=
                  Get_Index_Subtype_List (Def);
                Index : Iir;
             begin
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (Indexes_List) loop
                   Index := Get_Index_Type (Indexes_List, I);
-                  exit when Index = Null_Iir;
                   New_Record_Aggr_El
                     (List, Create_Static_Type_Definition_Type_Range (Index));
                end loop;
@@ -578,17 +574,16 @@ package body Trans.Chap3 is
 
          when Iir_Kind_Record_Subtype_Definition =>
             declare
-               El_List : constant Iir_List :=
+               El_List : constant Iir_Flist :=
                  Get_Elements_Declaration_List (Def);
-               El_Blist : constant Iir_List :=
+               El_Blist : constant Iir_Flist :=
                  Get_Elements_Declaration_List (Get_Base_Type (Def));
                El : Iir;
                Bel : Iir;
                Bel_Info : Field_Info_Acc;
             begin
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (El_Blist) loop
                   Bel := Get_Nth_Element (El_Blist, I);
-                  exit when Bel = Null_Iir;
                   Bel_Info := Get_Info (Bel);
                   if Bel_Info.Field_Bound /= O_Fnode_Null then
                      El := Get_Nth_Element (El_List, I);
@@ -621,18 +616,17 @@ package body Trans.Chap3 is
       case Get_Kind (Def) is
          when Iir_Kind_Array_Subtype_Definition =>
             declare
-               Indexes_List : constant Iir_List :=
+               Indexes_List : constant Iir_Flist :=
                  Get_Index_Subtype_List (Def);
-               Indexes_Def_List : constant Iir_List :=
+               Indexes_Def_List : constant Iir_Flist :=
                  Get_Index_Subtype_Definition_List (Base_Type);
                Index : Iir;
             begin
                if Get_Nbr_Elements (Indexes_List) > 1 then
                   Targ := Stabilize (Targ);
                end if;
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (Indexes_List) loop
                   Index := Get_Index_Type (Indexes_List, I);
-                  exit when Index = Null_Iir;
                   declare
                      Index_Type : constant Iir := Get_Base_Type (Index);
                      Index_Info : constant Type_Info_Acc :=
@@ -658,15 +652,14 @@ package body Trans.Chap3 is
 
          when Iir_Kind_Record_Subtype_Definition =>
             declare
-               El_List : constant Iir_List :=
+               El_List : constant Iir_Flist :=
                  Get_Elements_Declaration_List (Def);
                El : Iir;
                El_Info : Field_Info_Acc;
             begin
                Targ := Stabilize (Targ);
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (El_List) loop
                   El := Get_Nth_Element (El_List, I);
-                  exit when El = Null_Iir;
                   El_Info := Get_Info (Get_Base_Element_Declaration (El));
                   if El_Info.Field_Bound /= O_Fnode_Null then
                      Create_Composite_Subtype_Bounds
@@ -719,6 +712,7 @@ package body Trans.Chap3 is
            (Create_Identifier ("STB"),
             Base_Info.B.Bounds_Type, Global_Storage, Val);
       else
+         pragma Assert (Get_Type_Staticness (Def) /= Locally);
          Info.S.Static_Bounds := False;
          Info.S.Composite_Bounds := Create_Var
            (Create_Var_Identifier ("STB"), Base_Info.B.Bounds_Type);
@@ -736,7 +730,7 @@ package body Trans.Chap3 is
    procedure Translate_Array_Type_Bounds
      (Def : Iir_Array_Type_Definition; Info : Type_Info_Acc)
    is
-      Indexes_List    : constant Iir_List :=
+      Indexes_List    : constant Iir_Flist :=
         Get_Index_Subtype_Definition_List (Def);
       Constr          : O_Element_List;
       Dim             : String (1 .. 8);
@@ -747,9 +741,8 @@ package body Trans.Chap3 is
       Index_Type_Mark : Iir;
    begin
       Start_Record_Type (Constr);
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (Indexes_List) loop
          Index_Type_Mark := Get_Nth_Element (Indexes_List, I);
-         exit when Index_Type_Mark = Null_Iir;
          Index := Get_Index_Type (Index_Type_Mark);
 
          --  Index comes from a type mark.
@@ -834,16 +827,15 @@ package body Trans.Chap3 is
    function Get_Array_Subtype_Length (Def : Iir_Array_Subtype_Definition)
                                       return Iir_Int64
    is
-      Indexes_List : constant Iir_List := Get_Index_Subtype_List (Def);
+      Indexes_List : constant Iir_Flist := Get_Index_Subtype_List (Def);
       Index        : Iir;
       Idx_Len      : Iir_Int64;
       Len          : Iir_Int64;
    begin
       --  Check if the bounds of the array are locally static.
       Len := 1;
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (Indexes_List) loop
          Index := Get_Index_Type (Indexes_List, I);
-         exit when Index = Null_Iir;
 
          if Get_Type_Staticness (Index) /= Locally then
             return -1;
@@ -1004,12 +996,6 @@ package body Trans.Chap3 is
          New_Lit (Ghdl_Index_1));
    end Get_Type_Alignmask;
 
-   --  Get the alignment mask for type INFO (Mode_Value).
-   function Get_Type_Alignmask (Info : Type_Info_Acc) return O_Enode is
-   begin
-      return Get_Type_Alignmask (Info.Ortho_Type (Mode_Value));
-   end Get_Type_Alignmask;
-
    --  Align VALUE (of unsigned type) for type ATYPE.
    --  The formulae is: (V + (A - 1)) and not (A - 1), where A is the
    --  alignment for ATYPE in bytes.
@@ -1049,16 +1035,15 @@ package body Trans.Chap3 is
    procedure Translate_Record_Type_Bounds
      (Def : Iir_Record_Type_Definition; Info : Type_Info_Acc)
    is
-      List : constant Iir_List := Get_Elements_Declaration_List (Def);
+      List : constant Iir_Flist := Get_Elements_Declaration_List (Def);
       El : Iir;
       El_Tinfo : Type_Info_Acc;
       El_Info : Field_Info_Acc;
       Constr : O_Element_List;
    begin
       Start_Record_Type (Constr);
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (List) loop
          El := Get_Nth_Element (List, I);
-         exit when El = Null_Iir;
          El_Tinfo := Get_Info (Get_Type (El));
          if Is_Unbounded_Type (El_Tinfo) then
             El_Info := Get_Info (El);
@@ -1074,7 +1059,7 @@ package body Trans.Chap3 is
    procedure Translate_Record_Type (Def : Iir_Record_Type_Definition)
    is
       Info       : constant Type_Info_Acc := Get_Info (Def);
-      List       : constant Iir_List := Get_Elements_Declaration_List (Def);
+      List       : constant Iir_Flist := Get_Elements_Declaration_List (Def);
       Is_Unbounded : constant Boolean :=
         Get_Constraint_State (Def) /= Fully_Constrained;
       El_List    : O_Element_List;
@@ -1093,9 +1078,8 @@ package body Trans.Chap3 is
       Need_Size := False;
 
       --  First, translate the anonymous type of the elements.
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (List) loop
          El := Get_Nth_Element (List, I);
-         exit when El = Null_Iir;
          El_Type := Get_Type (El);
          if Get_Info (El_Type) = null then
             Push_Identifier_Prefix (Mark, Get_Identifier (El));
@@ -1113,9 +1097,8 @@ package body Trans.Chap3 is
       Info.Ortho_Type (Mode_Signal) := O_Tnode_Null;
       for Kind in Mode_Value .. Type_To_Last_Object_Kind (Def) loop
          Start_Record_Type (El_List);
-         for I in Natural loop
+         for I in Flist_First .. Flist_Last (List) loop
             El := Get_Nth_Element (List, I);
-            exit when El = Null_Iir;
             Field_Info := Get_Info (El);
             El_Tinfo := Get_Info (Get_Type (El));
             if Is_Complex_Type (El_Tinfo)
@@ -1161,11 +1144,11 @@ package body Trans.Chap3 is
       Base_Type  : constant Iir := Get_Base_Type (Def);
       Base_Info  : constant Type_Info_Acc := Get_Info (Base_Type);
       Info       : constant Type_Info_Acc := Get_Info (Def);
-      El_List    : constant Iir_List := Get_Elements_Declaration_List (Def);
+      El_List    : constant Iir_Flist := Get_Elements_Declaration_List (Def);
       Type_Mark  : constant Iir := Get_Subtype_Type_Mark (Def);
-      El_Blist   : constant Iir_List :=
+      El_Blist   : constant Iir_Flist :=
         Get_Elements_Declaration_List (Base_Type);
-      El_Tm_List : Iir_List;
+      El_Tm_List : Iir_Flist;
       El, B_El   : Iir_Element_Declaration;
       El_Type    : Iir;
       El_Btype   : Iir;
@@ -1188,9 +1171,8 @@ package body Trans.Chap3 is
          El_Tm_List := El_Blist;
       end if;
       Has_New_Constraints := False;
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (El_List) loop
          El := Get_Nth_Element (El_List, I);
-         exit when El = Null_Iir;
          El_Type := Get_Type (El);
          if Is_Fully_Constrained_Type (El) then
             El_Btype := Get_Type (Get_Nth_Element (El_Tm_List, I));
@@ -1225,44 +1207,42 @@ package body Trans.Chap3 is
       --  Base type is complex (unbounded record)
       Copy_Complex_Type (Info, Base_Info);
 
-      --  Then create the record type.
-      if Get_Type_Staticness (Def) = Locally then
-         --  Record is locally constrained: create a new record, containing the
-         --  base record and all the fields.
-         Info.Ortho_Type (Mode_Signal) := O_Tnode_Null;
-         for Kind in Mode_Value .. Type_To_Last_Object_Kind (Def) loop
-            Start_Record_Type (Rec);
-            New_Record_Field (Rec, Info.S.Box_Field (Kind), Wki_Base,
-                              Info.B.Base_Type (Kind));
-            for I in Natural loop
-               B_El := Get_Nth_Element (El_Blist, I);
-               exit when B_El = Null_Iir;
+      --  Then create the record type, containing the base record and the
+      --  fields.
+      Info.Ortho_Type (Mode_Signal) := O_Tnode_Null;
+      for Kind in Mode_Value .. Type_To_Last_Object_Kind (Def) loop
+         Start_Record_Type (Rec);
+         New_Record_Field (Rec, Info.S.Box_Field (Kind), Wki_Base,
+                           Info.B.Base_Type (Kind));
+         for I in Flist_First .. Flist_Last (El_Blist) loop
+            B_El := Get_Nth_Element (El_Blist, I);
+            El := Get_Nth_Element (El_List, I);
 
-               if Is_Unbounded_Type (Get_Info (Get_Type (B_El))) then
-                  El := Get_Nth_Element (El_List, I);
-                  if Kind = Mode_Value then
-                     Field_Info := Add_Info (El, Kind_Field);
-                  else
-                     Field_Info := Get_Info (El);
-                  end if;
-                  El := Get_Nth_Element (El_List, I);
-                  El_Tinfo := Get_Info (Get_Type (El));
-                  El_Tnode := El_Tinfo.Ortho_Type (Kind);
-                  New_Record_Field (Rec, Field_Info.Field_Node (Kind),
-                                    Create_Identifier_Without_Prefix (El),
-                                    El_Tnode);
+            --  This element has been locally constrained.
+            if Is_Unbounded_Type (Get_Info (Get_Type (B_El)))
+              and then
+              Get_Type_Staticness (Get_Type(El)) = Locally
+            then
+               if Kind = Mode_Value then
+                  Field_Info := Add_Info (El, Kind_Field);
+               else
+                  Field_Info := Get_Info (El);
                end if;
-            end loop;
-            Finish_Record_Type (Rec, Info.Ortho_Type (Kind));
+               El := Get_Nth_Element (El_List, I);
+               El_Tinfo := Get_Info (Get_Type (El));
+               El_Tnode := El_Tinfo.Ortho_Type (Kind);
+               New_Record_Field (Rec, Field_Info.Field_Node (Kind),
+                                 Create_Identifier_Without_Prefix (El),
+                                 El_Tnode);
+            end if;
          end loop;
+         Finish_Record_Type (Rec, Info.Ortho_Type (Kind));
+      end loop;
 
-         Finish_Type_Definition (Info);
-      else
-         --  Not locally constrained, but still constrained.
-         --  Objects have to be dynamically allocated and built.
+      Finish_Type_Definition (Info);
+
+      if Get_Type_Staticness (Def) /= Locally then
          Create_Size_Var (Def, Info);
-         Info.Ortho_Type := Info.B.Base_Type;
-         Info.Ortho_Ptr_Type := Info.B.Base_Ptr_Type;
       end if;
 
       if With_Vars then
@@ -1275,7 +1255,7 @@ package body Trans.Chap3 is
    is
       Info : constant Type_Info_Acc := Get_Info (Def);
       Base : constant O_Dnode := Info.C (Kind).Builder_Base_Param;
-      List : Iir_List;
+      List : constant Iir_Flist := Get_Elements_Declaration_List (Def);
       El   : Iir_Element_Declaration;
 
       Off_Var    : O_Dnode;
@@ -1304,10 +1284,8 @@ package body Trans.Chap3 is
       New_Assign_Stmt (New_Obj (Off_Var), Off_Val);
 
       --  Set memory for each complex element.
-      List := Get_Elements_Declaration_List (Def);
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (List) loop
          El := Get_Nth_Element (List, I);
-         exit when El = Null_Iir;
          El_Type := Get_Type (El);
          El_Tinfo := Get_Info (El_Type);
          if Is_Complex_Type (El_Tinfo)
@@ -1822,13 +1800,12 @@ package body Trans.Chap3 is
 
          when Iir_Kind_Array_Type_Definition =>
             declare
-               Index_List : constant Iir_List :=
+               Index_List : constant Iir_Flist :=
                  Get_Index_Subtype_List (Def);
                Index      : Iir;
             begin
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (Index_List) loop
                   Index := Get_Index_Type (Index_List, I);
-                  exit when Index = Null_Iir;
                   if Is_Anonymous_Type_Definition (Index) then
                      Create_Type_Definition_Type_Range (Index);
                   end if;
@@ -2004,22 +1981,20 @@ package body Trans.Chap3 is
    procedure Create_Record_Size_Var (Def : Iir; Kind : Object_Kind_Type)
    is
       Info        : constant Type_Info_Acc := Get_Info (Def);
-      List        : constant Iir_List := Get_Elements_Declaration_List (Def);
+      List        : constant Iir_Flist := Get_Elements_Declaration_List (Def);
       El          : Iir_Element_Declaration;
       El_Type     : Iir;
       El_Tinfo    : Type_Info_Acc;
       Inner_Type  : Iir;
-      Inner_Tinfo : Type_Info_Acc;
       Res         : O_Enode;
       Align_Var   : O_Dnode;
-      If_Blk      : O_If_Block;
    begin
       Open_Temp;
 
       --  Start with the size of the 'base' record, that
       --  contains all non-complex types and an offset for
       --  each complex types.
-      Res := New_Lit (New_Sizeof (Info.B.Base_Type (Kind), Ghdl_Index_Type));
+      Res := New_Lit (New_Sizeof (Info.Ortho_Type (Kind), Ghdl_Index_Type));
 
       --  Start with alignment of the record.
       --  ALIGN = ALIGNOF (record)
@@ -2028,43 +2003,39 @@ package body Trans.Chap3 is
             Align_Var := Create_Temp (Ghdl_Index_Type);
             New_Assign_Stmt
               (New_Obj (Align_Var),
-               Get_Type_Alignmask (Info.B.Base_Type (Kind)));
+               Get_Type_Alignmask (Info.Ortho_Type (Kind)));
          when Mode_Signal =>
             Res := Realign (Res, Ghdl_Signal_Ptr);
       end case;
 
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (List) loop
          El := Get_Nth_Element (List, I);
-         exit when El = Null_Iir;
          El_Type := Get_Type (El);
          El_Tinfo := Get_Info (El_Type);
-         if Is_Complex_Type (El_Tinfo)
-           or else Get_Kind (El) = Iir_Kind_Record_Element_Constraint
+         if Get_Type_Staticness (El_Type) /= Locally
+           and then
+           (Is_Complex_Type (El_Tinfo)
+              or else Get_Kind (El) = Iir_Kind_Record_Element_Constraint)
          then
             Inner_Type := Get_Innermost_Non_Array_Element (El_Type);
 
             --  Align (only for Mode_Value) the size,
             --  and add the size of the element.
             if Kind = Mode_Value then
-               Inner_Tinfo := Get_Info (Inner_Type);
-               --  If alignmask (Inner_Type) > alignmask then
-               --    alignmask = alignmask (Inner_type);
-               --  end if;
-               Start_If_Stmt
-                 (If_Blk,
-                  New_Compare_Op (ON_Gt,
-                    Get_Type_Alignmask (Inner_Tinfo),
-                    New_Obj_Value (Align_Var),
-                    Ghdl_Bool_Type));
+               --  Largest alignment.
                New_Assign_Stmt
-                 (New_Obj (Align_Var), Get_Type_Alignmask (Inner_Tinfo));
-               Finish_If_Stmt (If_Blk);
+                 (New_Obj (Align_Var),
+                  New_Dyadic_Op
+                    (ON_Or,
+                     New_Obj_Value (Align_Var),
+                     Get_Type_Alignmask
+                       (Get_Ortho_Type (Inner_Type, Mode_Value))));
                Res := Realign (Res, Inner_Type);
             end if;
+
             Res := New_Dyadic_Op
               (ON_Add_Ov,
-               New_Value (Get_Var (El_Tinfo.C (Kind).Size_Var)),
-               Res);
+               Res, New_Value (Get_Var (El_Tinfo.C (Kind).Size_Var)));
          end if;
       end loop;
       if Kind = Mode_Value then
@@ -2174,13 +2145,13 @@ package body Trans.Chap3 is
             end;
          when Iir_Kind_Record_Type_Definition =>
             declare
-               List : constant Iir_List := Get_Elements_Declaration_List (Def);
+               List : constant Iir_Flist :=
+                 Get_Elements_Declaration_List (Def);
                El   : Iir;
                Asub : Iir;
             begin
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (List) loop
                   El := Get_Nth_Element (List, I);
-                  exit when El = Null_Iir;
                   Asub := Get_Type (El);
                   if Is_Anonymous_Type_Definition (Asub) then
                      Handle_A_Subtype (Asub);
@@ -2189,13 +2160,13 @@ package body Trans.Chap3 is
             end;
          when Iir_Kind_Record_Subtype_Definition =>
             declare
-               List : constant Iir_List := Get_Elements_Declaration_List (Def);
+               List : constant Iir_Flist :=
+                 Get_Elements_Declaration_List (Def);
                El   : Iir;
                Asub : Iir;
             begin
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (List) loop
                   El := Get_Nth_Element (List, I);
-                  exit when El = Null_Iir;
                   if Get_Kind (El) = Iir_Kind_Record_Element_Constraint then
                      Asub := Get_Type (El);
                      if Is_Anonymous_Type_Definition (Asub) then
@@ -2550,7 +2521,7 @@ package body Trans.Chap3 is
 
    function Get_Thin_Array_Length (Atype : Iir) return O_Cnode
    is
-      Indexes_List : constant Iir_List := Get_Index_Subtype_List (Atype);
+      Indexes_List : constant Iir_Flist := Get_Index_Subtype_List (Atype);
       Nbr_Dim      : constant Natural := Get_Nbr_Elements (Indexes_List);
       Index        : Iir;
       Val          : Iir_Int64;
@@ -2568,7 +2539,7 @@ package body Trans.Chap3 is
    function Bounds_To_Range (B : Mnode; Atype : Iir; Dim : Positive)
                              return Mnode
    is
-      Indexes_List    : constant Iir_List :=
+      Indexes_List    : constant Iir_Flist :=
         Get_Index_Subtype_Definition_List (Get_Base_Type (Atype));
       Index_Type_Mark : constant Iir :=
         Get_Nth_Element (Indexes_List, Dim - 1);
@@ -2706,7 +2677,7 @@ package body Trans.Chap3 is
    function Get_Bounds_Length (Bounds : Mnode; Atype : Iir) return O_Enode
    is
       Type_Info     : constant Type_Info_Acc := Get_Info (Atype);
-      Index_List    : constant Iir_List := Get_Index_Subtype_List (Atype);
+      Index_List    : constant Iir_Flist := Get_Index_Subtype_List (Atype);
       Nbr_Dim       : constant Natural := Get_Nbr_Elements (Index_List);
       Dim_Length    : O_Enode;
       Res           : O_Enode;
@@ -3008,7 +2979,7 @@ package body Trans.Chap3 is
             end;
          when Type_Mode_Unbounded_Record =>
             declare
-               El_List : constant Iir_List :=
+               El_List : constant Iir_Flist :=
                  Get_Elements_Declaration_List (Atype);
                El : Iir;
                El_Type : Iir;
@@ -3022,9 +2993,8 @@ package body Trans.Chap3 is
                --  Size of base type
                Res := New_Lit (New_Sizeof (Type_Info.B.Base_Type (Kind),
                                            Ghdl_Index_Type));
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (El_List) loop
                   El := Get_Nth_Element (El_List, I);
-                  exit when El = Null_Iir;
                   El_Type := Get_Type (El);
                   El_Type_Info := Get_Info (El_Type);
                   if El_Type_Info.Type_Mode in Type_Mode_Unbounded then
@@ -3276,15 +3246,14 @@ package body Trans.Chap3 is
 
    function Locally_Array_Match (L_Type, R_Type : Iir) return Boolean
    is
-      L_Indexes : constant Iir_List := Get_Index_Subtype_List (L_Type);
-      R_Indexes : constant Iir_List := Get_Index_Subtype_List (R_Type);
+      L_Indexes : constant Iir_Flist := Get_Index_Subtype_List (L_Type);
+      R_Indexes : constant Iir_Flist := Get_Index_Subtype_List (R_Type);
       L_El      : Iir;
       R_El      : Iir;
    begin
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (L_Indexes) loop
          L_El := Get_Index_Type (L_Indexes, I);
          R_El := Get_Index_Type (R_Indexes, I);
-         exit when L_El = Null_Iir and R_El = Null_Iir;
          if Eval_Discrete_Type_Length (L_El)
            /= Eval_Discrete_Type_Length (R_El)
          then
@@ -3318,23 +3287,20 @@ package body Trans.Chap3 is
       else
          --  Check length match.
          declare
-            Index_List : constant Iir_List :=
+            Index_List : constant Iir_Flist :=
               Get_Index_Subtype_List (L_Type);
-            Index      : Iir;
             Cond       : O_Enode;
             Sub_Cond   : O_Enode;
          begin
-            for I in Natural loop
-               Index := Get_Nth_Element (Index_List, I);
-               exit when Index = Null_Iir;
+            for I in 1 .. Get_Nbr_Elements (Index_List) loop
                Sub_Cond := New_Compare_Op
                  (ON_Neq,
                   M2E (Range_To_Length
-                    (Get_Array_Range (L_Node, L_Type, I + 1))),
+                    (Get_Array_Range (L_Node, L_Type, I))),
                   M2E (Range_To_Length
-                    (Get_Array_Range (R_Node, R_Type, I + 1))),
+                    (Get_Array_Range (R_Node, R_Type, I))),
                   Ghdl_Bool_Type);
-               if I = 0 then
+               if I = 1 then
                   Cond := Sub_Cond;
                else
                   Cond := New_Dyadic_Op (ON_Or, Cond, Sub_Cond);

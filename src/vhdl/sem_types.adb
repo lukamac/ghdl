@@ -101,13 +101,12 @@ package body Sem_Types is
          when Iir_Kind_Record_Type_Definition
            | Iir_Kind_Record_Subtype_Definition =>
             declare
-               El_List : constant Iir_List :=
+               El_List : constant Iir_Flist :=
                  Get_Elements_Declaration_List (Atype);
                El : Iir;
             begin
-               for I in Natural loop
+               for I in Flist_First .. Flist_Last (El_List) loop
                   El := Get_Nth_Element (El_List, I);
-                  exit when El = Null_Iir;
                   Set_Type_Has_Signal (Get_Type (El));
                end loop;
             end;
@@ -751,41 +750,36 @@ package body Sem_Types is
 
    function Sem_Enumeration_Type_Definition  (Def: Iir; Decl: Iir) return Iir
    is
+      Literal_List : constant Iir_Flist := Get_Enumeration_Literal_List (Def);
+      El: Iir;
+      Only_Characters : Boolean;
    begin
       Set_Base_Type (Def, Def);
       Set_Type_Staticness (Def, Locally);
       Set_Signal_Type_Flag (Def, True);
 
       --  Makes all literal visible.
-      declare
-         El: Iir;
-         Literal_List: Iir_List;
-         Only_Characters : Boolean;
-      begin
-         Only_Characters := True;
-         Literal_List := Get_Enumeration_Literal_List (Def);
-         for I in Natural loop
-            El := Get_Nth_Element (Literal_List, I);
-            exit when El = Null_Iir;
-            Set_Expr_Staticness (El, Locally);
-            Set_Name_Staticness (El, Locally);
-            Set_Type (El, Def);
-            Sem.Compute_Subprogram_Hash (El);
-            Sem_Scopes.Add_Name (El);
-            Name_Visible (El);
-            Xref_Decl (El);
+      Only_Characters := True;
+      for I in Flist_First .. Flist_Last (Literal_List) loop
+         El := Get_Nth_Element (Literal_List, I);
+         Set_Expr_Staticness (El, Locally);
+         Set_Name_Staticness (El, Locally);
+         Set_Type (El, Def);
+         Sem.Compute_Subprogram_Hash (El);
+         Sem_Scopes.Add_Name (El);
+         Name_Visible (El);
+         Xref_Decl (El);
 
-            --  LRM93 3.1.1 Enumeration types
-            --  An enumeration type is said to be a character type if at least
-            --  one of its enumeration literals is a character literal.
-            if Name_Table.Is_Character (Get_Identifier (El)) then
-               Set_Is_Character_Type (Def, True);
-            else
-               Only_Characters := False;
-            end if;
-         end loop;
-         Set_Only_Characters_Flag (Def, Only_Characters);
-      end;
+         --  LRM93 3.1.1 Enumeration types
+         --  An enumeration type is said to be a character type if at least
+         --  one of its enumeration literals is a character literal.
+         if Name_Table.Is_Character (Get_Identifier (El)) then
+            Set_Is_Character_Type (Def, True);
+         else
+            Only_Characters := False;
+         end if;
+      end loop;
+      Set_Only_Characters_Flag (Def, Only_Characters);
       Set_Resolved_Flag (Def, False);
 
       Create_Range_Constraint_For_Enumeration_Type (Def);
@@ -806,8 +800,8 @@ package body Sem_Types is
       --  Analyzed type of previous element
       Last_Type : Iir;
 
-      El_List : constant Iir_List := Get_Elements_Declaration_List (Def);
-      El: Iir;
+      El_List : constant Iir_Flist := Get_Elements_Declaration_List (Def);
+      El : Iir;
       El_Type : Iir;
       Resolved_Flag : Boolean;
       Type_Staticness : Iir_Staticness;
@@ -823,10 +817,8 @@ package body Sem_Types is
       Constraint := Fully_Constrained;
       Set_Signal_Type_Flag (Def, True);
 
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (El_List) loop
          El := Get_Nth_Element (El_List, I);
-         exit when El = Null_Iir;
-
          El_Type := Get_Subtype_Indication (El);
          if El_Type /= Null_Iir then
             --  Be careful for a declaration list (r,g,b: integer).
@@ -880,18 +872,17 @@ package body Sem_Types is
 
    function Sem_Unbounded_Array_Type_Definition (Def: Iir) return Iir
    is
-      Index_List : constant Iir_List :=
+      Index_List : constant Iir_Flist :=
         Get_Index_Subtype_Definition_List (Def);
       Index_Type : Iir;
    begin
       Set_Base_Type (Def, Def);
 
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (Index_List) loop
          Index_Type := Get_Nth_Element (Index_List, I);
-         exit when Index_Type = Null_Iir;
 
          Index_Type := Sem_Type_Mark (Index_Type);
-         Replace_Nth_Element (Index_List, I, Index_Type);
+         Set_Nth_Element (Index_List, I, Index_Type);
 
          Index_Type := Get_Type (Index_Type);
          if Get_Kind (Index_Type) not in Iir_Kinds_Discrete_Type_Definition
@@ -933,10 +924,10 @@ package body Sem_Types is
    function Sem_Constrained_Array_Type_Definition (Def: Iir; Decl: Iir)
                                                   return Iir
    is
+      Index_List : constant Iir_Flist := Get_Index_Constraint_List (Def);
       Index_Type : Iir;
       Index_Name : Iir;
-      Index_List : Iir_List;
-      Base_Index_List : Iir_List;
+      Base_Index_List : Iir_Flist;
       El_Type : Iir;
       Staticness : Iir_Staticness;
 
@@ -974,15 +965,13 @@ package body Sem_Types is
       Location_Copy (Base_Type, Def);
       Set_Base_Type (Base_Type, Base_Type);
       Set_Type_Declarator (Base_Type, Decl);
-      Base_Index_List := Create_Iir_List;
+      Base_Index_List := Create_Iir_Flist (Get_Nbr_Elements (Index_List));
       Set_Index_Subtype_Definition_List (Base_Type, Base_Index_List);
       Set_Index_Subtype_List (Base_Type, Base_Index_List);
 
       Staticness := Locally;
-      Index_List := Get_Index_Constraint_List (Def);
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (Index_List) loop
          Index_Type := Get_Nth_Element (Index_List, I);
-         exit when Index_Type = Null_Iir;
 
          Index_Name := Sem_Discrete_Range_Integer (Index_Type);
          if Index_Name /= Null_Iir then
@@ -995,7 +984,7 @@ package body Sem_Types is
             Set_Type (Index_Name, Natural_Subtype_Definition);
          end if;
 
-         Replace_Nth_Element (Index_List, I, Index_Name);
+         Set_Nth_Element (Index_List, I, Index_Name);
 
          Index_Type := Get_Index_Type (Index_Name);
          Staticness := Min (Staticness, Get_Type_Staticness (Index_Type));
@@ -1021,7 +1010,7 @@ package body Sem_Types is
          Index_Name := Build_Simple_Name (Index_Type, Index_Name);
          Set_Type (Index_Name, Get_Type (Index_Type));
 
-         Append_Element (Base_Index_List, Index_Name);
+         Set_Nth_Element (Base_Index_List, I, Index_Name);
       end loop;
       Set_Index_Subtype_List (Def, Index_List);
 
@@ -1376,16 +1365,14 @@ package body Sem_Types is
    --  Create a copy of elements_declaration_list of SRC and set it to DST.
    procedure Copy_Record_Elements_Declaration_List (Dst : Iir; Src : Iir)
    is
-      El_List, New_El_List : Iir_List;
+      El_List : constant Iir_Flist := Get_Elements_Declaration_List (Src);
+      New_El_List : Iir_Flist;
       El, New_El : Iir;
    begin
-      New_El_List := Create_Iir_List;
+      New_El_List := Create_Iir_Flist (Get_Nbr_Elements (El_List));
       Set_Elements_Declaration_List (Dst, New_El_List);
-      El_List := Get_Elements_Declaration_List (Src);
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (El_List) loop
          El := Get_Nth_Element (El_List, I);
-         exit when El = Null_Iir;
-
          New_El := Create_Iir (Iir_Kind_Element_Declaration);
          Location_Copy (New_El, El);
          Set_Parent (New_El, Dst);
@@ -1394,7 +1381,7 @@ package body Sem_Types is
          Set_Base_Element_Declaration (New_El,
                                        Get_Base_Element_Declaration (El));
          Set_Element_Position (New_El, Get_Element_Position (El));
-         Append_Element (New_El_List, New_El);
+         Set_Nth_Element (New_El_List, I, New_El);
       end loop;
    end Copy_Record_Elements_Declaration_List;
 
@@ -1442,7 +1429,7 @@ package body Sem_Types is
             Res := Create_Iir (Iir_Kind_Array_Subtype_Definition);
             Set_Type_Staticness (Res, Get_Type_Staticness (Def));
             Set_Resolved_Flag (Res, Get_Resolved_Flag (Def));
-            Set_Index_Constraint_List (Res, Null_Iir_List);
+            Set_Index_Constraint_List (Res, Null_Iir_Flist);
             Set_Index_Subtype_List
               (Res, Get_Index_Subtype_Definition_List (Def));
             Set_Element_Subtype (Res, Get_Element_Subtype (Def));
@@ -1482,6 +1469,113 @@ package body Sem_Types is
       return Res;
    end Copy_Subtype_Indication;
 
+   procedure Sem_Array_Constraint_Indexes (Def : Iir; Type_Mark : Iir)
+   is
+      El_Type : constant Iir := Get_Element_Subtype (Type_Mark);
+      Type_Index, Subtype_Index: Iir;
+      Base_Type : Iir;
+      Index_Staticness : Iir_Staticness;
+      Type_Nbr_Dim : Natural;
+      Subtype_Nbr_Dim : Natural;
+      Type_Index_List : Iir_Flist;
+      Subtype_Index_List : Iir_Flist;
+      Subtype_Index_List2 : Iir_Flist;
+   begin
+      -- Check each index constraint against array type.
+      Base_Type := Get_Base_Type (Type_Mark);
+      Set_Base_Type (Def, Base_Type);
+
+      Index_Staticness := Locally;
+      Type_Index_List := Get_Index_Subtype_Definition_List (Base_Type);
+      Subtype_Index_List := Get_Index_Constraint_List (Def);
+
+      --  LRM08 5.3.2.2
+      --  If an array constraint of the first form (including an index
+      --  constraint) applies to a type or subtype, then the type or
+      --  subtype shall be an unconstrained or partially constrained
+      --  array type with no index constraint applying to the index
+      --  subtypes, or an access type whose designated type is such
+      --  a type.
+      if Get_Kind (Type_Mark) = Iir_Kind_Array_Subtype_Definition
+        and then Get_Index_Constraint_Flag (Type_Mark)
+      then
+         Error_Msg_Sem (+Def, "constrained array cannot be re-constrained");
+      end if;
+      if Subtype_Index_List = Null_Iir_Flist then
+         --  Array is not constrained.
+         Set_Index_Constraint_Flag (Def, False);
+         Set_Index_Subtype_List (Def, Type_Index_List);
+      else
+         Type_Nbr_Dim := Get_Nbr_Elements (Type_Index_List);
+         Subtype_Nbr_Dim := Get_Nbr_Elements (Subtype_Index_List);
+
+         if Subtype_Nbr_Dim /= Type_Nbr_Dim then
+            --  Number of dimension mismatch.  Create an index with the right
+            --  length.
+            Subtype_Index_List2 := Create_Iir_Flist (Type_Nbr_Dim);
+            for I in 1 .. Natural'Min (Subtype_Nbr_Dim, Type_Nbr_Dim) loop
+               Set_Nth_Element
+                 (Subtype_Index_List2, I - 1,
+                  Get_Nth_Element (Subtype_Index_List, I - 1));
+            end loop;
+
+            if Subtype_Nbr_Dim < Type_Nbr_Dim then
+               Error_Msg_Sem
+                 (+Def,
+                  "subtype has less indexes than %n defined at %l",
+                  (+Type_Mark, +Type_Mark));
+
+               --  Clear extra indexes.
+               for I in Subtype_Nbr_Dim + 1 .. Type_Nbr_Dim loop
+                  Set_Nth_Element (Subtype_Index_List2, I - 1, Null_Iir);
+               end loop;
+            else
+               Error_Msg_Sem
+                 (+Get_Nth_Element (Subtype_Index_List, Type_Nbr_Dim),
+                  "subtype has more indexes than %n defined at %l",
+                  (+Type_Mark, +Type_Mark));
+
+               --  Forget extra indexes.
+            end if;
+            Destroy_Iir_Flist (Subtype_Index_List);
+            Subtype_Index_List := Subtype_Index_List2;
+         end if;
+
+         for I in 1 .. Type_Nbr_Dim loop
+            Type_Index := Get_Nth_Element (Type_Index_List, I - 1);
+
+            if I <= Subtype_Nbr_Dim then
+               Subtype_Index := Get_Nth_Element (Subtype_Index_List, I - 1);
+               Subtype_Index := Sem_Discrete_Range_Expression
+                 (Subtype_Index, Get_Index_Type (Type_Index), True);
+               if Subtype_Index /= Null_Iir then
+                  Subtype_Index :=
+                    Range_To_Subtype_Indication (Subtype_Index);
+                  Index_Staticness := Min
+                    (Index_Staticness,
+                     Get_Type_Staticness (Get_Type_Of_Subtype_Indication
+                                            (Subtype_Index)));
+               end if;
+            else
+               Subtype_Index := Null_Iir;
+            end if;
+            if Subtype_Index = Null_Iir then
+               --  Create a fake subtype from type_index.
+               --  FIXME: It is too fake.
+               Subtype_Index := Type_Index;
+               Index_Staticness := None;
+            end if;
+            Set_Nth_Element (Subtype_Index_List, I - 1, Subtype_Index);
+         end loop;
+
+         Set_Index_Subtype_List (Def, Subtype_Index_List);
+         Set_Index_Constraint_Flag (Def, True);
+      end if;
+      Set_Type_Staticness
+        (Def, Min (Get_Type_Staticness (El_Type), Index_Staticness));
+      Set_Signal_Type_Flag (Def, Get_Signal_Type_Flag (Type_Mark));
+   end Sem_Array_Constraint_Indexes;
+
    --  DEF is an incomplete subtype_indication or array_constraint,
    --  TYPE_MARK is the base type of the subtype_indication.
    function Sem_Array_Constraint
@@ -1489,13 +1583,7 @@ package body Sem_Types is
    is
       El_Type : constant Iir := Get_Element_Subtype (Type_Mark);
       Res : Iir;
-      Type_Index, Subtype_Index: Iir;
-      Base_Type : Iir;
       El_Def : Iir;
-      Index_Staticness : Iir_Staticness;
-      Error_Seen : Boolean;
-      Type_Index_List : Iir_List;
-      Subtype_Index_List : Iir_List;
       Resolv_Func : Iir := Null_Iir;
       Resolv_El : Iir := Null_Iir;
       Resolv_Ind : Iir;
@@ -1548,95 +1636,11 @@ package body Sem_Types is
 
                --  No element constraint.
                El_Def := Null_Iir;
-               Index_Staticness := None;
 
             when Iir_Kind_Array_Subtype_Definition =>
                -- Case of a constraint for an array.
-               -- Check each index constraint against array type.
-
-               Base_Type := Get_Base_Type (Type_Mark);
-               Set_Base_Type (Def, Base_Type);
                El_Def := Get_Array_Element_Constraint (Def);
-
-               Index_Staticness := Locally;
-               Error_Seen := False;
-               Type_Index_List :=
-                 Get_Index_Subtype_Definition_List (Base_Type);
-               Subtype_Index_List := Get_Index_Constraint_List (Def);
-
-               --  LRM08 5.3.2.2
-               --  If an array constraint of the first form (including an index
-               --  constraint) applies to a type or subtype, then the type or
-               --  subtype shall be an unconstrained or partially constrained
-               --  array type with no index constraint applying to the index
-               --  subtypes, or an access type whose designated type is such
-               --  a type.
-               if Get_Kind (Type_Mark) = Iir_Kind_Array_Subtype_Definition
-                 and then Get_Index_Constraint_Flag (Type_Mark)
-               then
-                  Error_Msg_Sem
-                    (+Def, "constrained array cannot be re-constrained");
-               end if;
-               if Subtype_Index_List = Null_Iir_List then
-                  --  Array is not constrained.
-                  Set_Index_Constraint_Flag (Def, False);
-                  Set_Index_Subtype_List (Def, Type_Index_List);
-               else
-                  for I in Natural loop
-                     Type_Index := Get_Nth_Element (Type_Index_List, I);
-                     Subtype_Index := Get_Nth_Element (Subtype_Index_List, I);
-                     exit when Type_Index = Null_Iir
-                       and Subtype_Index = Null_Iir;
-
-                     if Type_Index = Null_Iir then
-                        Error_Msg_Sem
-                          (+Subtype_Index,
-                           "subtype has more indexes than %n defined at %l",
-                           (+Type_Mark, +Type_Mark));
-                        --  Forget extra indexes.
-                        Set_Nbr_Elements (Subtype_Index_List, I);
-                        exit;
-                     end if;
-                     if Subtype_Index = Null_Iir then
-                        if not Error_Seen then
-                           Error_Msg_Sem
-                             (+Def,
-                              "subtype has less indexes than %n defined at %l",
-                              (+Type_Mark, +Type_Mark));
-                           Error_Seen := True;
-                        end if;
-                     else
-                        Subtype_Index := Sem_Discrete_Range_Expression
-                          (Subtype_Index, Get_Index_Type (Type_Index), True);
-                        if Subtype_Index /= Null_Iir then
-                           Subtype_Index :=
-                             Range_To_Subtype_Indication (Subtype_Index);
-                           Index_Staticness := Min
-                             (Index_Staticness,
-                              Get_Type_Staticness
-                                (Get_Type_Of_Subtype_Indication
-                                   (Subtype_Index)));
-                        end if;
-                     end if;
-                     if Subtype_Index = Null_Iir then
-                        --  Create a fake subtype from type_index.
-                        --  FIXME: It is too fake.
-                        Subtype_Index := Type_Index;
-                        Index_Staticness := None;
-                     end if;
-                     if Error_Seen then
-                        Append_Element (Subtype_Index_List, Subtype_Index);
-                     else
-                        Replace_Nth_Element
-                          (Subtype_Index_List, I, Subtype_Index);
-                     end if;
-                  end loop;
-                  Set_Index_Subtype_List (Def, Subtype_Index_List);
-                  Set_Index_Constraint_Flag (Def, True);
-               end if;
-               Set_Type_Staticness
-                 (Def, Min (Get_Type_Staticness (El_Type), Index_Staticness));
-               Set_Signal_Type_Flag (Def, Get_Signal_Type_Flag (Type_Mark));
+               Sem_Array_Constraint_Indexes (Def, Type_Mark);
                Res := Def;
 
             when others =>
@@ -1741,13 +1745,10 @@ package body Sem_Types is
       El_List : Iir_List;
       El : Iir;
    begin
-      if Get_Prefix (Def) /= Null_Iir then
-         raise Internal_Error;
-      end if;
+      pragma Assert (Get_Prefix (Def) = Null_Iir);
       Res := Create_Iir (Iir_Kind_Record_Subtype_Definition);
       Location_Copy (Res, Def);
       El_List := Create_Iir_List;
-      Set_Elements_Declaration_List (Res, El_List);
       Chain := Get_Association_Chain (Def);
       while Chain /= Null_Iir loop
          if Get_Kind (Chain) /= Iir_Kind_Association_Element_By_Expression
@@ -1762,6 +1763,7 @@ package body Sem_Types is
          end if;
          Chain := Get_Chain (Chain);
       end loop;
+      Set_Elements_Declaration_List (Res, List_To_Flist (El_List));
       return Res;
    end Reparse_As_Record_Constraint;
 
@@ -1798,7 +1800,6 @@ package body Sem_Types is
          end if;
       else
          El_List := Create_Iir_List;
-         Set_Index_Constraint_List (Res, El_List);
          while Chain /= Null_Iir loop
             if Get_Kind (Chain) /= Iir_Kind_Association_Element_By_Expression
               or else Get_Formal (Chain) /= Null_Iir
@@ -1809,6 +1810,7 @@ package body Sem_Types is
             end if;
             Chain := Get_Chain (Chain);
          end loop;
+         Set_Index_Constraint_List (Res, List_To_Flist (El_List));
       end if;
 
       Def_El_Type := Get_Element_Subtype (Def_Type);
@@ -1828,14 +1830,14 @@ package body Sem_Types is
      (Def : Iir; Type_Mark : Iir; Resolution : Iir) return Iir
    is
       Res : Iir;
-      El_List, Tm_El_List : Iir_List;
+      El_List, Tm_El_List : Iir_Flist;
       El : Iir;
       Tm_El : Iir;
       Tm_El_Type : Iir;
       El_Type : Iir;
-      Res_List : Iir_List;
+      Res_List : Iir_Flist;
 
-      Index_List : Iir_List;
+      Index_List : Iir_Flist;
       Index_El : Iir;
    begin
       Res := Create_Iir (Iir_Kind_Record_Subtype_Definition);
@@ -1851,21 +1853,18 @@ package body Sem_Types is
             Free_Name (Def);
             Set_Signal_Type_Flag (Res, Get_Signal_Type_Flag (Type_Mark));
             Set_Constraint_State (Res, Get_Constraint_State (Type_Mark));
-            El_List := Null_Iir_List;
+            El_List := Null_Iir_Flist;
 
          when Iir_Kind_Array_Subtype_Definition =>
             --  Record constraints are parsed as array constraints.
             pragma Assert (Get_Kind (Def) = Iir_Kind_Array_Subtype_Definition);
             Index_List := Get_Index_Constraint_List (Def);
-            El_List := Create_Iir_List;
+            El_List := Create_Iir_Flist (Get_Nbr_Elements (Index_List));
             Set_Elements_Declaration_List (Res, El_List);
-            for I in Natural loop
+            for I in Flist_First .. Flist_Last (Index_List) loop
                Index_El := Get_Nth_Element (Index_List, I);
-               exit when Index_El = Null_Iir;
                El := Reparse_As_Record_Element_Constraint (Index_El);
-               if El /= Null_Iir then
-                  Append_Element (El_List, El);
-               end if;
+               Set_Nth_Element (El_List, I, El);
             end loop;
 
          when Iir_Kind_Record_Subtype_Definition =>
@@ -1876,7 +1875,7 @@ package body Sem_Types is
             Error_Kind ("sem_record_constraint", Def);
       end case;
 
-      Res_List := Null_Iir_List;
+      Res_List := Null_Iir_Flist;
       if Resolution /= Null_Iir then
          case Get_Kind (Resolution) is
             when Iir_Kinds_Denoting_Name =>
@@ -1893,7 +1892,7 @@ package body Sem_Types is
       end if;
 
       Tm_El_List := Get_Elements_Declaration_List (Type_Mark);
-      if El_List /= Null_Iir_List or Res_List /= Null_Iir_List then
+      if El_List /= Null_Iir_Flist or Res_List /= Null_Iir_Flist then
          --  Constraints (either range or resolution) have been added.
          declare
             Nbr_Els : constant Natural := Get_Nbr_Elements (Tm_El_List);
@@ -1904,11 +1903,11 @@ package body Sem_Types is
             Staticness : Iir_Staticness;
          begin
             --  Fill ELS with record constraints.
-            if El_List /= Null_Iir_List then
-               for I in Natural loop
+            if El_List /= Null_Iir_Flist then
+               for I in Flist_First .. Flist_Last (El_List) loop
                   El := Get_Nth_Element (El_List, I);
-                  exit when El = Null_Iir;
-                  Tm_El := Find_Name_In_List (Tm_El_List, Get_Identifier (El));
+                  Tm_El :=
+                    Find_Name_In_Flist (Tm_El_List, Get_Identifier (El));
                   if Tm_El = Null_Iir then
                      --  Constraint element references an element name that
                      --  doesn't exist.
@@ -1950,15 +1949,15 @@ package body Sem_Types is
                   end if;
                end loop;
                --  Record element constraints are now in Els.
-               Destroy_Iir_List (El_List);
+               Destroy_Iir_Flist (El_List);
             end if;
 
             --  Fill Res_Els (handle resolution constraints).
-            if Res_List /= Null_Iir_List then
-               for I in Natural loop
+            if Res_List /= Null_Iir_Flist then
+               for I in Flist_First .. Flist_Last (Res_List) loop
                   El := Get_Nth_Element (Res_List, I);
-                  exit when El = Null_Iir;
-                  Tm_El := Find_Name_In_List (Tm_El_List, Get_Identifier (El));
+                  Tm_El :=
+                    Find_Name_In_Flist (Tm_El_List, Get_Identifier (El));
                   if Tm_El = Null_Iir then
                      Error_Msg_Sem (+El, "%n has no %n", (+Type_Mark, +El));
                   else
@@ -1974,11 +1973,11 @@ package body Sem_Types is
                   end if;
                   --Free_Iir (El);
                end loop;
-               Destroy_Iir_List (Res_List);
+               Destroy_Iir_Flist (Res_List);
             end if;
 
             --  Build elements list.
-            El_List := Create_Iir_List;
+            El_List := Create_Iir_Flist (Nbr_Els);
             Set_Elements_Declaration_List (Res, El_List);
             Constraint := Fully_Constrained;
             Staticness := Locally;
@@ -2008,7 +2007,7 @@ package body Sem_Types is
                                                      Res_Els (I));
                   Set_Type (El, El_Type);
                end if;
-               Append_Element (El_List, El);
+               Set_Nth_Element (El_List, I, El);
                Constraint := Update_Record_Constraint (Constraint, El_Type);
                Staticness := Min (Staticness, Get_Type_Staticness (El_Type));
             end loop;

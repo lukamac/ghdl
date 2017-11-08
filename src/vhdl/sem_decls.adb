@@ -2248,11 +2248,10 @@ package body Sem_Decls is
    function Signature_Match (N_Entity : Iir; Sig : Iir_Signature)
                             return Boolean
    is
-      List : Iir_List;
+      List : constant Iir_Flist := Get_Type_Marks_List (Sig);
       Inter : Iir;
       El : Iir;
    begin
-      List := Get_Type_Marks_List (Sig);
       case Get_Kind (N_Entity) is
          when Iir_Kind_Enumeration_Literal =>
             --  LRM93 2.3.2  Signatures
@@ -2264,9 +2263,9 @@ package body Sem_Decls is
             if Get_Return_Type_Mark (Sig) = Null_Iir then
                return False;
             end if;
-            return List = Null_Iir_List
-              and then Get_Type (N_Entity)
-              = Get_Type (Get_Return_Type_Mark (Sig));
+            return List = Null_Iir_Flist
+              and then (Get_Type (N_Entity)
+                          = Get_Type (Get_Return_Type_Mark (Sig)));
          when Iir_Kind_Function_Declaration
            | Iir_Kind_Interface_Function_Declaration =>
             --  LRM93 2.3.2  Signatures
@@ -2305,15 +2304,13 @@ package body Sem_Decls is
       --    mark of the signature is the same as the base type of the
       --    corresponding formal parameter of the subprogram; [and finally, ]
       Inter := Get_Interface_Declaration_Chain (N_Entity);
-      if List = Null_Iir_List then
+      if List = Null_Iir_Flist then
          return Inter = Null_Iir;
       end if;
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (List) loop
          El := Get_Nth_Element (List, I);
-         if El = Null_Iir and Inter = Null_Iir then
-            return True;
-         end if;
-         if El = Null_Iir or Inter = Null_Iir then
+         if Inter = Null_Iir then
+            --  More type marks in the signature than in the interface.
             return False;
          end if;
          if Get_Base_Type (Get_Type (Inter)) /= Get_Type (El) then
@@ -2321,26 +2318,24 @@ package body Sem_Decls is
          end if;
          Inter := Get_Chain (Inter);
       end loop;
-      --  Avoid a spurious warning.
-      return False;
+      --  Match only if the number of type marks is the same.
+      return Inter = Null_Iir;
    end Signature_Match;
 
    --  Extract from NAME the named entity whose profile matches with SIG.
    function Sem_Signature (Name : Iir; Sig : Iir_Signature) return Iir
    is
+      List : constant Iir_Flist := Get_Type_Marks_List (Sig);
       Res : Iir;
       El : Iir;
-      List : Iir_List;
       Error : Boolean;
    begin
       --  Sem signature.
-      List := Get_Type_Marks_List (Sig);
-      if List /= Null_Iir_List then
-         for I in Natural loop
+      if List /= Null_Iir_Flist then
+         for I in Flist_First .. Flist_Last (List) loop
             El := Get_Nth_Element (List, I);
-            exit when El = Null_Iir;
             El := Sem_Type_Mark (El);
-            Replace_Nth_Element (List, I, El);
+            Set_Nth_Element (List, I, El);
 
             --  Reuse the Type field of the name for the base type.  This is
             --  a deviation from the use of Type in a name, but restricted to
@@ -2413,7 +2408,7 @@ package body Sem_Decls is
       Type_Decl : constant Iir := Get_Type_Declarator (Def);
       Last : Iir;
       El : Iir;
-      Enum_List : Iir_Enumeration_Literal_List;
+      Enum_List : Iir_Flist;
 
       --  Append an implicit alias
       procedure Add_Implicit_Alias (Decl : Iir)
@@ -2458,9 +2453,8 @@ package body Sem_Decls is
          --      of the literals of the base type immediately follows the
          --      alias declaration for the enumeration type; [...]
          Enum_List := Get_Enumeration_Literal_List (Def);
-         for I in Natural loop
+         for I in Flist_First .. Flist_Last (Enum_List) loop
             El := Get_Nth_Element (Enum_List, I);
-            exit when El = Null_Iir;
             --  LRM93 4.3.3.2  Non-Object Aliases
             --      [...] each such implicit declaration has, as its alias
             --      designator, the simple name or character literal of the
@@ -2722,8 +2716,7 @@ package body Sem_Decls is
    end Sem_Alias_Declaration;
 
    procedure Sem_Group_Template_Declaration
-     (Decl : Iir_Group_Template_Declaration)
-   is
+     (Decl : Iir_Group_Template_Declaration) is
    begin
       Sem_Scopes.Add_Name (Decl);
       Sem_Scopes.Name_Visible (Decl);
@@ -2734,7 +2727,7 @@ package body Sem_Decls is
    is
       use Tokens;
 
-      Constituent_List : Iir_Group_Constituent_List;
+      Constituent_List : Iir_Flist;
       Template : Iir_Group_Template_Declaration;
       Template_Name : Iir;
       Class, Prev_Class : Token_Type;
@@ -2755,9 +2748,8 @@ package body Sem_Decls is
       Constituent_List := Get_Group_Constituent_List (Group);
       El_Entity := Get_Entity_Class_Entry_Chain (Template);
       Prev_Class := Tok_Eof;
-      for I in Natural loop
+      for I in Flist_First .. Flist_Last (Constituent_List) loop
          El := Get_Nth_Element (Constituent_List, I);
-         exit when El = Null_Iir;
 
          Sem_Name (El);
 
@@ -2786,7 +2778,7 @@ package body Sem_Decls is
             Error_Overload (El_Name);
          else
             El := Finish_Sem_Name (El);
-            Replace_Nth_Element (Constituent_List, I, El);
+            Set_Nth_Element (Constituent_List, I, El);
             El_Name := Get_Named_Entity (El);
 
             --  Statements are textually afer the group declaration.  To avoid

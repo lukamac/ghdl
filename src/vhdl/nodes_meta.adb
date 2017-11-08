@@ -46,7 +46,7 @@ package body Nodes_Meta is
       Field_Enum_Pos => Type_Iir_Int32,
       Field_Physical_Literal => Type_Iir,
       Field_Fp_Value => Type_Iir_Fp64,
-      Field_Simple_Aggregate_List => Type_Iir_List,
+      Field_Simple_Aggregate_List => Type_Iir_Flist,
       Field_String8_Id => Type_String8_Id,
       Field_String_Length => Type_Int32,
       Field_Bit_String_Base => Type_Number_Base_Type,
@@ -144,9 +144,9 @@ package body Nodes_Meta is
       Field_Complete_Type_Definition => Type_Iir,
       Field_Incomplete_Type_Ref_Chain => Type_Iir,
       Field_Associated_Type => Type_Iir,
-      Field_Enumeration_Literal_List => Type_Iir_List,
+      Field_Enumeration_Literal_List => Type_Iir_Flist,
       Field_Entity_Class_Entry_Chain => Type_Iir,
-      Field_Group_Constituent_List => Type_Iir_List,
+      Field_Group_Constituent_List => Type_Iir_Flist,
       Field_Unit_Chain => Type_Iir,
       Field_Primary_Unit => Type_Iir,
       Field_Identifier => Type_Name_Id,
@@ -171,16 +171,16 @@ package body Nodes_Meta is
       Field_Is_Character_Type => Type_Boolean,
       Field_Type_Staticness => Type_Iir_Staticness,
       Field_Constraint_State => Type_Iir_Constraint,
-      Field_Index_Subtype_List => Type_Iir_List,
-      Field_Index_Subtype_Definition_List => Type_Iir_List,
+      Field_Index_Subtype_List => Type_Iir_Flist,
+      Field_Index_Subtype_Definition_List => Type_Iir_Flist,
       Field_Element_Subtype_Indication => Type_Iir,
       Field_Element_Subtype => Type_Iir,
-      Field_Index_Constraint_List => Type_Iir_List,
+      Field_Index_Constraint_List => Type_Iir_Flist,
       Field_Array_Element_Constraint => Type_Iir,
-      Field_Elements_Declaration_List => Type_Iir_List,
+      Field_Elements_Declaration_List => Type_Iir_Flist,
       Field_Designated_Type => Type_Iir,
       Field_Designated_Subtype_Indication => Type_Iir,
-      Field_Index_List => Type_Iir_List,
+      Field_Index_List => Type_Iir_Flist,
       Field_Reference => Type_Iir,
       Field_Nature_Declarator => Type_Iir,
       Field_Across_Type => Type_Iir,
@@ -306,7 +306,7 @@ package body Nodes_Meta is
       Field_Has_Disconnect_Flag => Type_Boolean,
       Field_Has_Active_Flag => Type_Boolean,
       Field_Is_Within_Flag => Type_Boolean,
-      Field_Type_Marks_List => Type_Iir_List,
+      Field_Type_Marks_List => Type_Iir_Flist,
       Field_Implicit_Alias_Flag => Type_Boolean,
       Field_Alias_Signature => Type_Iir,
       Field_Attribute_Signature => Type_Iir,
@@ -5904,6 +5904,62 @@ package body Nodes_Meta is
       end case;
    end Set_Iir_Direction;
 
+   function Get_Iir_Flist
+      (N : Iir; F : Fields_Enum) return Iir_Flist is
+   begin
+      pragma Assert (Fields_Type (F) = Type_Iir_Flist);
+      case F is
+         when Field_Simple_Aggregate_List =>
+            return Get_Simple_Aggregate_List (N);
+         when Field_Enumeration_Literal_List =>
+            return Get_Enumeration_Literal_List (N);
+         when Field_Group_Constituent_List =>
+            return Get_Group_Constituent_List (N);
+         when Field_Index_Subtype_List =>
+            return Get_Index_Subtype_List (N);
+         when Field_Index_Subtype_Definition_List =>
+            return Get_Index_Subtype_Definition_List (N);
+         when Field_Index_Constraint_List =>
+            return Get_Index_Constraint_List (N);
+         when Field_Elements_Declaration_List =>
+            return Get_Elements_Declaration_List (N);
+         when Field_Index_List =>
+            return Get_Index_List (N);
+         when Field_Type_Marks_List =>
+            return Get_Type_Marks_List (N);
+         when others =>
+            raise Internal_Error;
+      end case;
+   end Get_Iir_Flist;
+
+   procedure Set_Iir_Flist
+      (N : Iir; F : Fields_Enum; V: Iir_Flist) is
+   begin
+      pragma Assert (Fields_Type (F) = Type_Iir_Flist);
+      case F is
+         when Field_Simple_Aggregate_List =>
+            Set_Simple_Aggregate_List (N, V);
+         when Field_Enumeration_Literal_List =>
+            Set_Enumeration_Literal_List (N, V);
+         when Field_Group_Constituent_List =>
+            Set_Group_Constituent_List (N, V);
+         when Field_Index_Subtype_List =>
+            Set_Index_Subtype_List (N, V);
+         when Field_Index_Subtype_Definition_List =>
+            Set_Index_Subtype_Definition_List (N, V);
+         when Field_Index_Constraint_List =>
+            Set_Index_Constraint_List (N, V);
+         when Field_Elements_Declaration_List =>
+            Set_Elements_Declaration_List (N, V);
+         when Field_Index_List =>
+            Set_Index_List (N, V);
+         when Field_Type_Marks_List =>
+            Set_Type_Marks_List (N, V);
+         when others =>
+            raise Internal_Error;
+      end case;
+   end Set_Iir_Flist;
+
    function Get_Iir_Fp64
       (N : Iir; F : Fields_Enum) return Iir_Fp64 is
    begin
@@ -6031,26 +6087,10 @@ package body Nodes_Meta is
             return Get_Dependence_List (N);
          when Field_Analysis_Checks_List =>
             return Get_Analysis_Checks_List (N);
-         when Field_Simple_Aggregate_List =>
-            return Get_Simple_Aggregate_List (N);
          when Field_Entity_Name_List =>
             return Get_Entity_Name_List (N);
          when Field_Signal_List =>
             return Get_Signal_List (N);
-         when Field_Enumeration_Literal_List =>
-            return Get_Enumeration_Literal_List (N);
-         when Field_Group_Constituent_List =>
-            return Get_Group_Constituent_List (N);
-         when Field_Index_Subtype_List =>
-            return Get_Index_Subtype_List (N);
-         when Field_Index_Subtype_Definition_List =>
-            return Get_Index_Subtype_Definition_List (N);
-         when Field_Index_Constraint_List =>
-            return Get_Index_Constraint_List (N);
-         when Field_Elements_Declaration_List =>
-            return Get_Elements_Declaration_List (N);
-         when Field_Index_List =>
-            return Get_Index_List (N);
          when Field_Sensitivity_List =>
             return Get_Sensitivity_List (N);
          when Field_Callees_List =>
@@ -6059,8 +6099,6 @@ package body Nodes_Meta is
             return Get_Guard_Sensitivity_List (N);
          when Field_Instantiation_List =>
             return Get_Instantiation_List (N);
-         when Field_Type_Marks_List =>
-            return Get_Type_Marks_List (N);
          when Field_Overload_List =>
             return Get_Overload_List (N);
          when Field_PSL_Clock_Sensitivity =>
@@ -6081,26 +6119,10 @@ package body Nodes_Meta is
             Set_Dependence_List (N, V);
          when Field_Analysis_Checks_List =>
             Set_Analysis_Checks_List (N, V);
-         when Field_Simple_Aggregate_List =>
-            Set_Simple_Aggregate_List (N, V);
          when Field_Entity_Name_List =>
             Set_Entity_Name_List (N, V);
          when Field_Signal_List =>
             Set_Signal_List (N, V);
-         when Field_Enumeration_Literal_List =>
-            Set_Enumeration_Literal_List (N, V);
-         when Field_Group_Constituent_List =>
-            Set_Group_Constituent_List (N, V);
-         when Field_Index_Subtype_List =>
-            Set_Index_Subtype_List (N, V);
-         when Field_Index_Subtype_Definition_List =>
-            Set_Index_Subtype_Definition_List (N, V);
-         when Field_Index_Constraint_List =>
-            Set_Index_Constraint_List (N, V);
-         when Field_Elements_Declaration_List =>
-            Set_Elements_Declaration_List (N, V);
-         when Field_Index_List =>
-            Set_Index_List (N, V);
          when Field_Sensitivity_List =>
             Set_Sensitivity_List (N, V);
          when Field_Callees_List =>
@@ -6109,8 +6131,6 @@ package body Nodes_Meta is
             Set_Guard_Sensitivity_List (N, V);
          when Field_Instantiation_List =>
             Set_Instantiation_List (N, V);
-         when Field_Type_Marks_List =>
-            Set_Type_Marks_List (N, V);
          when Field_Overload_List =>
             Set_Overload_List (N, V);
          when Field_PSL_Clock_Sensitivity =>

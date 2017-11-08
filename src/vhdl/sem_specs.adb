@@ -379,14 +379,23 @@ package body Sem_Specs is
       --  Note: ENT and DECL are different for aliases.
       function Sem_Named_Entity1 (Ent : Iir; Decl : Iir) return Boolean
       is
+         use Tokens;
          Ent_Id : constant Name_Id := Get_Identifier (Ent);
       begin
          if (not Is_Designator or else Ent_Id = Get_Identifier (Name))
            and then Ent_Id /= Null_Identifier
          then
             if Is_Designator then
+               --  The designator is neither ALL nor OTHERS.
                Set_Named_Entity (Name, Ent);
                Xref_Ref (Name, Ent);
+
+               if Get_Entity_Class (Attr) = Tok_Label then
+                  --  Concurrent or sequential statements appear later in the
+                  --  AST, but their label are considered to appear before
+                  --  other items in the declarative part.
+                  Set_Is_Forward_Ref (Name, True);
+               end if;
             end if;
             if Get_Visible_Flag (Ent) = False then
                Error_Msg_Sem (+Attr, "%n is not yet visible", +Ent);
@@ -470,13 +479,12 @@ package body Sem_Specs is
                   Def := Get_Type_Definition (El);
                   if Get_Kind (Def) = Iir_Kind_Enumeration_Type_Definition then
                      declare
-                        List : Iir_List;
+                        List : constant Iir_Flist :=
+                          Get_Enumeration_Literal_List (Def);
                         El1 : Iir;
                      begin
-                        List := Get_Enumeration_Literal_List (Def);
-                        for I in Natural loop
+                        for I in Flist_First .. Flist_Last (List) loop
                            El1 := Get_Nth_Element (List, I);
-                           exit when El1 = Null_Iir;
                            Sem_Named_Entity (El1);
                         end loop;
                      end;
