@@ -790,24 +790,31 @@ package body Disp_Vhdl is
       Disp_End (Def, "record");
    end Disp_Record_Type_Definition;
 
-   procedure Disp_Designator_List (List: Iir_List) is
-      El: Iir;
+   procedure Disp_Designator_List (List: Iir_List)
+   is
+      El : Iir;
+      It : List_Iterator;
+      Is_First : Boolean;
    begin
-      if List = Null_Iir_List then
-         return;
-      elsif List = Iir_List_All then
-         Put ("all");
-         return;
-      end if;
-      for I in Natural loop
-         El := Get_Nth_Element (List, I);
-         exit when El = Null_Iir;
-         if I > 0 then
-            Put (", ");
-         end if;
-         Disp_Expression (El);
-         --Disp_Text_Literal (El);
-      end loop;
+      case List is
+         when Null_Iir_List =>
+            null;
+         when Iir_List_All =>
+            Put ("all");
+         when others =>
+            It := List_Iterate (List);
+            Is_First := True;
+            while Is_Valid (It) loop
+               El := Get_Element (It);
+               if not Is_First then
+                  Put (", ");
+               else
+                  Is_First := False;
+               end if;
+               Disp_Expression (El);
+               Next (It);
+            end loop;
+      end case;
    end Disp_Designator_List;
 
    -- Display the full definition of a type, ie the sequence that can create
@@ -1525,18 +1532,17 @@ package body Disp_Vhdl is
       end if;
    end Disp_Subprogram_Body;
 
-   procedure Disp_Instantiation_List (Insts: Iir_List) is
+   procedure Disp_Instantiation_List (Insts: Iir_Flist) is
       El : Iir;
    begin
-      if Insts = Iir_List_All then
+      if Insts = Iir_Flist_All then
          Put ("all");
-      elsif Insts = Iir_List_Others then
+      elsif Insts = Iir_Flist_Others then
          Put ("others");
       else
-         for I in Natural loop
+         for I in Flist_First .. Flist_Last (Insts) loop
             El := Get_Nth_Element (Insts, I);
-            exit when El = Null_Iir;
-            if I /= Natural'First then
+            if I /= Flist_First then
                Put (", ");
             end if;
             Disp_Name (El);
@@ -1608,19 +1614,18 @@ package body Disp_Vhdl is
       Put (Tokens.Image (Tok));
    end Disp_Entity_Kind;
 
-   procedure Disp_Entity_Name_List (List : Iir_List)
+   procedure Disp_Entity_Name_List (List : Iir_Flist)
    is
       El : Iir;
    begin
-      if List = Iir_List_All then
+      if List = Iir_Flist_All then
          Put ("all");
-      elsif List = Iir_List_Others then
+      elsif List = Iir_Flist_Others then
          Put ("others");
       else
-         for I in Natural loop
+         for I in Flist_First .. Flist_Last (List) loop
             El := Get_Nth_Element (List, I);
-            exit when El = Null_Iir;
-            if I /= 0 then
+            if I /= Flist_First then
                Put (", ");
             end if;
             if Get_Kind (El) = Iir_Kind_Signature then

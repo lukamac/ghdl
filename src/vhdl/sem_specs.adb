@@ -705,7 +705,7 @@ package body Sem_Specs is
       Name : Iir;
       Attr : Iir_Attribute_Declaration;
       Attr_Type : Iir;
-      List : Iir_List;
+      List : Iir_Flist;
       Expr : Iir;
       Res : Boolean;
    begin
@@ -766,7 +766,7 @@ package body Sem_Specs is
       --  implicitly and explicitly defined, that inherit the attribute, as
       --  defined below:
       List := Get_Entity_Name_List (Spec);
-      if List = Iir_List_All then
+      if List = Iir_Flist_All then
          --  o If the reserved word ALL is supplied, then the attribute
          --  specification applies to all named entities of the specified
          --  class that are declared in the immediatly enclosing
@@ -777,7 +777,7 @@ package body Sem_Specs is
               (Warnid_Specs, +Spec,
                "attribute specification apply to no named entity");
          end if;
-      elsif List = Iir_List_Others then
+      elsif List = Iir_Flist_Others then
          --  o If the reserved word OTHERS is supplied, then the attribute
          --  specification applies to named entities of the specified class
          --  that are declared in the immediately enclosing declarative
@@ -797,9 +797,8 @@ package body Sem_Specs is
          declare
             El : Iir;
          begin
-            for I in Natural loop
+            for I in Flist_First .. Flist_Last (List) loop
                El := Get_Nth_Element (List, I);
-               exit when El = Null_Iir;
                if Get_Kind (El) = Iir_Kind_Signature then
                   Sem_Signature_Entity_Designator (El, Spec);
                else
@@ -892,7 +891,7 @@ package body Sem_Specs is
          Spec := Get_Attribute_Specification_Chain (Spec);
       end if;
       while Spec /= Null_Iir loop
-         pragma Assert (Get_Entity_Name_List (Spec) in Iir_Lists_All_Others);
+         pragma Assert (Get_Entity_Name_List (Spec) in Iir_Flists_All_Others);
          Ent_Class := Get_Entity_Class (Spec);
          if Ent_Class = Decl_Class or Ent_Class = Decl_Class2 then
             Has_Error := False;
@@ -959,7 +958,7 @@ package body Sem_Specs is
       Type_Mark : Iir;
       Atype : Iir;
       Time_Expr : Iir;
-      List : Iir_List;
+      List : Iir_Flist;
       El : Iir;
       Sig : Iir;
       Prefix : Iir;
@@ -984,17 +983,16 @@ package body Sem_Specs is
       end if;
 
       List := Get_Signal_List (Dis);
-      if List = Iir_List_All or List = Iir_List_Others then
+      if List in Iir_Flists_All_Others then
          --  FIXME: checks todo
          null;
       else
-         for I in Natural loop
+         for I in Flist_First .. Flist_Last (List) loop
             El := Get_Nth_Element (List, I);
-            exit when El = Null_Iir;
 
             Sem_Name (El);
             El := Finish_Sem_Name (El);
-            Replace_Nth_Element (List, I, El);
+            Set_Nth_Element (List, I, El);
 
             Sig := Get_Named_Entity (El);
             Sig := Name_To_Object (Sig);
@@ -1321,7 +1319,7 @@ package body Sem_Specs is
          return Res;
       end Apply_Component_Specification;
 
-      List : Iir_List;
+      List : Iir_Flist;
       El : Iir;
       Inter : Sem_Scopes.Name_Interpretation_Type;
       Comp : Iir;
@@ -1339,7 +1337,7 @@ package body Sem_Specs is
       end if;
 
       List := Get_Instantiation_List (Spec);
-      if List = Iir_List_All then
+      if List = Iir_Flist_All then
          --  LRM93 5.2
          --  * If the reserved word ALL is supplied, then the configuration
          --    specification applies to all instances of the specified
@@ -1354,7 +1352,7 @@ package body Sem_Specs is
             Warning_Msg_Sem (Warnid_Specs, +Spec,
                              "component specification applies to no instance");
          end if;
-      elsif List = Iir_List_Others then
+      elsif List = Iir_Flist_Others then
          --  LRM93 5.2
          --  * If the reserved word OTHERS is supplied, then the
          --    configuration specification applies to instances of the
@@ -1386,9 +1384,8 @@ package body Sem_Specs is
          --    instantiation statement whose corresponding instantiated unit
          --    does not name a component.
          -- FIXME: error message are *really* cryptic.
-         for I in Natural loop
+         for I in Flist_First .. Flist_Last (List) loop
             El := Get_Nth_Element (List, I);
-            exit when El = Null_Iir;
             Inter := Sem_Scopes.Get_Interpretation (Get_Identifier (El));
             if not Valid_Interpretation (Inter) then
                Error_Msg_Sem

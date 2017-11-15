@@ -67,23 +67,22 @@ package body Disp_Tree is
    procedure Disp_Iir_List
      (Tree_List : Iir_List; Tab : Natural; Depth : Natural)
    is
-      El: Iir;
+      It : List_Iterator;
    begin
-      if Tree_List = Null_Iir_List then
-         Put_Line ("null-list");
-      elsif Tree_List = Iir_List_All then
-         Put_Line ("list-all");
-      elsif Tree_List = Iir_List_Others then
-         Put_Line ("list-others");
-      else
-         New_Line;
-         for I in Natural loop
-            El := Get_Nth_Element (Tree_List, I);
-            exit when El = Null_Iir;
-            Put_Indent (Tab);
-            Disp_Iir (El, Tab + 1, Depth);
-         end loop;
-      end if;
+      case Tree_List is
+         when Null_Iir_List =>
+            Put_Line ("null-list");
+         when Iir_List_All =>
+            Put_Line ("list-all");
+         when others =>
+            New_Line;
+            It := List_Iterate (Tree_List);
+            while Is_Valid (It) loop
+               Put_Indent (Tab);
+               Disp_Iir (Get_Element (It), Tab + 1, Depth);
+               Next (It);
+            end loop;
+      end case;
    end Disp_Iir_List;
 
    procedure Disp_Iir_Flist
@@ -132,26 +131,24 @@ package body Disp_Tree is
    end Disp_Tree_Flat_Chain;
    pragma Unreferenced (Disp_Tree_Flat_Chain);
 
-   procedure Disp_Tree_List_Flat (Tree_List: Iir_List; Tab: Natural)
+   procedure Disp_Tree_List_Flat (Tree_List : Iir_List; Tab : Natural)
    is
-      El: Iir;
+      It : List_Iterator;
    begin
-      if Tree_List = Null_Iir_List then
-         Put_Indent (Tab);
-         Put_Line (" null-list");
-      elsif Tree_List = Iir_List_All then
-         Put_Indent (Tab);
-         Put_Line (" list-all");
-      elsif Tree_List = Iir_List_Others then
-         Put_Indent (Tab);
-         Put_Line (" list-others");
-      else
-         for I in Natural loop
-            El := Get_Nth_Element (Tree_List, I);
-            exit when El = Null_Iir;
-            Disp_Iir (El, Tab, 0);
-         end loop;
-      end if;
+      case Tree_List is
+         when Null_Iir_List =>
+            Put_Indent (Tab);
+            Put_Line (" null-list");
+         when Iir_List_All =>
+            Put_Indent (Tab);
+            Put_Line (" list-all");
+         when others =>
+            It := List_Iterate (Tree_List);
+            while Is_Valid (It) loop
+               Disp_Iir (Get_Element (It), Tab, 0);
+               Next (It);
+            end loop;
+      end case;
    end Disp_Tree_List_Flat;
 
    function Image_Name_Id (Ident: Name_Id) return String

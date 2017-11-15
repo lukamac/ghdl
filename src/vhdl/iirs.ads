@@ -5349,18 +5349,9 @@ package Iirs is
    --Iir_Kind_Disconnection_Specification
      Iir_Kind_Configuration_Specification;
 
-   -------------------------------------
-   -- Types and subtypes declarations --
-   -------------------------------------
+   --  Nodes and lists.
 
-   -- Level 1 base class.
    subtype Iir is Nodes.Node_Type;
-   subtype Iir_List is Lists.List_Type;
-   Null_Iir_List : constant Iir_List := Lists.Null_List;
-   Iir_List_All : constant Iir_List := Lists.List_All;
-   Iir_List_Others : constant Iir_List := Lists.List_Others;
-   subtype Iir_Lists_All_Others is Iir_List
-     range Iir_List_Others .. Iir_List_All;
 
    Null_Iir : constant Iir := Nodes.Null_Node;
 
@@ -5372,19 +5363,20 @@ package Iirs is
    function Is_Valid (Node : Iir) return Boolean;
    pragma Inline (Is_Valid);
 
-   function Is_Null_List (Node : Iir_List) return Boolean;
-   pragma Inline (Is_Null_List);
-
    function "=" (L, R : Iir) return Boolean renames Nodes."=";
 
    function Get_Last_Node return Iir renames Nodes.Get_Last_Node;
 
+   subtype Iir_List is Lists.List_Type;
+   Null_Iir_List : constant Iir_List := Lists.Null_List;
+   Iir_List_All : constant Iir_List := Lists.List_All;
+
+   subtype List_Iterator is Lists.Iterator;
+   function Is_Null_List (Node : Iir_List) return Boolean;
+   pragma Inline (Is_Null_List);
+
    function Create_Iir_List return Iir_List
      renames Lists.Create_List;
-   function Get_Nth_Element (L : Iir_List; N : Natural) return Iir
-     renames Lists.Get_Nth_Element;
-   procedure Replace_Nth_Element (L : Iir_List; N : Natural; El : Iir)
-     renames Lists.Replace_Nth_Element;
    procedure Append_Element (L : Iir_List; E : Iir)
      renames Lists.Append_Element;
    procedure Add_Element (L : Iir_List; E : Iir)
@@ -5393,18 +5385,33 @@ package Iirs is
      renames Lists.Destroy_List;
    function Get_Nbr_Elements (L : Iir_List) return Natural
      renames Lists.Get_Nbr_Elements;
-   procedure Set_Nbr_Elements (L : Iir_List; Nbr : Natural)
-     renames Lists.Set_Nbr_Elements;
    function Get_First_Element (L : Iir_List) return Iir
      renames Lists.Get_First_Element;
-   function Get_Last_Element (L : Iir_List) return Iir
-     renames Lists.Get_Last_Element;
+   function Is_Empty (L : Iir_List) return Boolean
+     renames Lists.Is_Empty;
+
+   function List_Iterate (List : Iir_List) return List_Iterator
+     renames Lists.Iterate;
+   function List_Iterate_Safe (List : Iir_List) return List_Iterator
+     renames Lists.Iterate_Safe;
+   function Is_Valid (It : List_Iterator) return Boolean
+     renames Lists.Is_Valid;
+   procedure Next (It : in out List_Iterator)
+     renames Lists.Next;
+   function Get_Element (It : List_Iterator) return Iir
+     renames Lists.Get_Element;
+   procedure Set_Element (It : List_Iterator; El : Iir)
+     renames Lists.Set_Element;
+
    function "=" (L, R : Iir_List) return Boolean renames Lists."=";
 
    subtype Iir_Flist is Flists.Flist_Type;
    Null_Iir_Flist   : constant Iir_Flist := Flists.Null_Flist;
    Iir_Flist_Others : constant Iir_Flist := Flists.Flist_Others;
    Iir_Flist_All    : constant Iir_Flist := Flists.Flist_All;
+
+   subtype Iir_Flists_All_Others is Iir_Flist
+     range Iir_Flist_Others .. Iir_Flist_All;
 
    Flist_First : constant Natural := Flists.Ffirst;
    function Flist_Last (Flist : Iir_Flist) return Natural
@@ -5590,19 +5597,11 @@ package Iirs is
 
    -- Lists.
 
-   subtype Iir_Index_List is Iir_Flist;
-
    subtype Iir_Design_Unit_List is Iir_List;
-
-   subtype Iir_Enumeration_Literal_List is Iir_List;
-
-   subtype Iir_Designator_List is Iir_List;
 
    subtype Iir_Attribute_Value_Chain is Iir_List;
 
    subtype Iir_Overload_List is Iir;
-
-   subtype Iir_Group_Constituent_List is Iir_List;
 
    subtype Iir_Callees_List is Iir_List;
 
@@ -5982,8 +5981,8 @@ package Iirs is
    procedure Set_Entity_Class (Target : Iir; Kind : Token_Type);
 
    --  Field: Field8 (uc)
-   function Get_Entity_Name_List (Target : Iir) return Iir_List;
-   procedure Set_Entity_Name_List (Target : Iir; Names : Iir_List);
+   function Get_Entity_Name_List (Target : Iir) return Iir_Flist;
+   procedure Set_Entity_Name_List (Target : Iir; Names : Iir_Flist);
 
    --  Field: Field6
    function Get_Attribute_Designator (Target : Iir) return Iir;
@@ -6001,8 +6000,8 @@ package Iirs is
    procedure Set_Attribute_Specification (Val : Iir; Attr : Iir);
 
    --  Field: Field3 Of_Maybe_Ref (uc)
-   function Get_Signal_List (Target : Iir) return Iir_List;
-   procedure Set_Signal_List (Target : Iir; List : Iir_List);
+   function Get_Signal_List (Target : Iir) return Iir_Flist;
+   procedure Set_Signal_List (Target : Iir; List : Iir_Flist);
 
    --  Field: Field3 Forward_Ref
    function Get_Designated_Entity (Val : Iir_Attribute_Value) return Iir;
@@ -6952,8 +6951,8 @@ package Iirs is
    procedure Set_Component_Name (Target : Iir; Name : Iir);
 
    --  Field: Field1 (uc)
-   function Get_Instantiation_List (Target : Iir) return Iir_List;
-   procedure Set_Instantiation_List (Target : Iir; List : Iir_List);
+   function Get_Instantiation_List (Target : Iir) return Iir_Flist;
+   procedure Set_Instantiation_List (Target : Iir; List : Iir_Flist);
 
    --  Field: Field3
    function Get_Entity_Aspect (Target : Iir_Binding_Indication) return Iir;
