@@ -491,8 +491,18 @@ package body Elaboration is
 
                      --  Load the body now, as it can add objects in the
                      --  package instance.
-                     Body_Design := Libraries.Load_Secondary_Unit
-                       (Design, Null_Identifier, Design_Unit);
+                     --  Don't try to load optionnal but obsolete package body.
+                     Body_Design := Libraries.Find_Secondary_Unit
+                       (Design, Null_Identifier);
+                     if Body_Design /= Null_Iir
+                       and then
+                       (Get_Need_Body (Library_Unit)
+                          or else Get_Date (Body_Design) /= Date_Obsolete)
+                     then
+                        Libraries.Load_Design_Unit (Body_Design, Design_Unit);
+                     else
+                        Body_Design := Null_Iir;
+                     end if;
 
                      --  First the packages on which DESIGN depends.
                      Elaborate_Dependence (Design);
@@ -1624,6 +1634,8 @@ package body Elaboration is
                   if Arch = Null_Iir then
                      Arch := Libraries.Get_Latest_Architecture
                        (Get_Entity (Aspect));
+                  else
+                     Arch := Strip_Denoting_Name (Arch);
                   end if;
                   Config := Get_Library_Unit
                     (Get_Default_Configuration_Declaration (Arch));
@@ -2145,20 +2157,17 @@ package body Elaboration is
       --  Gather children and reverse the list.
       declare
          Child, Prev, First : Block_Instance_Acc;
+         Info : Sim_Info_Acc;
       begin
          Child := Instance.Children;
          First := null;
          while Child /= null loop
-            declare
-               Slot : constant Instance_Slot_Type :=
-                 Get_Info (Child.Label).Inst_Slot;
-            begin
-               --  Skip processes (they have no slot).
-               if Slot /= Invalid_Instance_Slot then
-                  pragma Assert (Sub_Instances (Slot) = null);
-                  Sub_Instances (Slot) := Child;
-               end if;
-            end;
+            Info := Get_Info (Child.Label);
+            if Info.Kind = Kind_Block then
+               pragma Assert (Info.Inst_Slot /= Invalid_Instance_Slot);
+               pragma Assert (Sub_Instances (Info.Inst_Slot) = null);
+               Sub_Instances (Info.Inst_Slot) := Child;
+            end if;
 
             --  Reverse
             Prev := Child.Brother;
