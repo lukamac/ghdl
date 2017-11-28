@@ -17,28 +17,22 @@
 --  02111-1307, USA.
 
 with Iirs; use Iirs;
-with Iir_Values; use Iir_Values;
+with Simul.Environments; use Simul.Environments;
 with Types; use Types;
 
-package Annotations is
-   Trace_Annotation : Boolean := False;
+package Simul.Annotations is
+   --  Decorate the tree in order to be usable with the internal simulator.
+   procedure Annotate (Unit : Iir_Design_Unit);
 
-   -- Decorate the tree in order to be usable with the internal simulator.
-   procedure Annotate (Tree: Iir_Design_Unit);
-
-   -- Disp annotations for an iir node.
-   procedure Disp_Vhdl_Info (Node: Iir);
-   procedure Disp_Tree_Info (Node: Iir);
-
-   type Object_Slot_Type is new Natural;
-   subtype Parameter_Slot_Type is Object_Slot_Type range 0 .. 2**15;
-
-   type Pkg_Index_Type is new Natural;
-   Nbr_Packages : Pkg_Index_Type := 0;
+   --  Disp annotations for an iir node.
+   procedure Disp_Vhdl_Info (Node : Iir);
+   procedure Disp_Tree_Info (Node : Iir);
 
    --  For Kind_Extra: a number.  Kind_Extra is not used by annotations, and
    --  is free for another pass like preelab.
    type Extra_Slot_Type is new Natural;
+
+   Nbr_Packages : Pkg_Index_Type := 0;
 
    -- Annotations are used to collect informations for elaboration and to
    -- locate iir_value_literal for signals, variables or constants.
@@ -54,35 +48,8 @@ package Annotations is
       Kind_PSL,
       Kind_Extra);
 
-   type Sim_Info_Type (Kind: Sim_Info_Kind);
+   type Sim_Info_Type (Kind : Sim_Info_Kind);
    type Sim_Info_Acc is access all Sim_Info_Type;
-
-   -- Scope corresponding to an object.
-   type Scope_Kind_Type is
-     (
-      --  For a package, the depth is
-      Scope_Kind_Package,
-      Scope_Kind_Component,
-      Scope_Kind_Frame,
-      Scope_Kind_Pkg_Inst,
-      Scope_Kind_None
-     );
-   type Scope_Depth_Type is range 0 .. 2**15;
-   type Scope_Type (Kind : Scope_Kind_Type := Scope_Kind_None) is record
-      case Kind is
-         when Scope_Kind_Package =>
-            Pkg_Index : Pkg_Index_Type;
-         when Scope_Kind_Component =>
-            null;
-         when Scope_Kind_Frame =>
-            Depth : Scope_Depth_Type;
-         when Scope_Kind_Pkg_Inst =>
-            Pkg_Param : Parameter_Slot_Type;
-            Pkg_Parent : Sim_Info_Acc;
-         when Scope_Kind_None =>
-            null;
-      end case;
-   end record;
 
    type Instance_Slot_Type is new Integer;
    Invalid_Instance_Slot : constant Instance_Slot_Type := -1;
@@ -139,9 +106,9 @@ package Annotations is
    end record;
 
    -- Get/Set annotation fied from/to an iir.
-   procedure Set_Info (Target: Iir; Info: Sim_Info_Acc);
+   procedure Set_Info (Target : Iir; Info : Sim_Info_Acc);
    pragma Inline (Set_Info);
-   function Get_Info (Target: Iir) return Sim_Info_Acc;
+   function Get_Info (Target : Iir) return Sim_Info_Acc;
    pragma Inline (Get_Info);
 
    --  Expand the annotation table.  This is automatically done by Annotate,
@@ -150,4 +117,4 @@ package Annotations is
 
    --  For debugging.
    function Image (Scope : Scope_Type) return String;
-end Annotations;
+end Simul.Annotations;

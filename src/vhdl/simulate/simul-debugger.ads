@@ -16,10 +16,10 @@
 --  Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 --  02111-1307, USA.
 
-with Elaboration; use Elaboration;
 with Iirs; use Iirs;
+with Simul.Environments; use Simul.Environments;
 
-package Debugger is
+package Simul.Debugger is
    Flag_Debugger : Boolean := False;
    Flag_Interractive : Boolean := False;
 
@@ -88,4 +88,4 @@ package Debugger is
 
    --  Call the debugger in case of error.
    procedure Debug_Error;
-end Debugger;
+end Simul.Debugger;
