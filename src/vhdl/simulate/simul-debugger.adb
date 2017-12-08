@@ -300,9 +300,9 @@ package body Simul.Debugger is
 
    procedure Disp_Instances_Tree is
    begin
-      for I in Package_Instances'Range loop
-         if Package_Instances (I) /= null then
-            Disp_Instances_Tree_Name (Package_Instances (I));
+      for I in Global_Instances.Objects'Range loop
+         if Global_Instances.Objects (I) /= null then
+            Disp_Instances_Tree_Name (Global_Instances.Objects (I).Instance);
          end if;
       end loop;
       Disp_Instances_Tree_Name (Top_Instance);
@@ -313,7 +313,6 @@ package body Simul.Debugger is
    --  Used to debug.
    procedure Disp_Block_Instance (Instance: Block_Instance_Acc) is
    begin
-      Put_Line ("scope:" & Image (Instance.Block_Scope));
       Put_Line ("Objects:");
       for I in Instance.Objects'Range loop
          Put (Object_Slot_Type'Image (I) & ": ");
@@ -387,7 +386,7 @@ package body Simul.Debugger is
            | Iir_Value_Protected
            | Iir_Value_Quantity
            | Iir_Value_Terminal
-           | Iir_Value_Environment =>
+           | Iir_Value_Instance =>
             raise Internal_Error;
       end case;
    end Disp_Signal;
@@ -938,6 +937,18 @@ package body Simul.Debugger is
       New_Line;
    end Disp_A_Frame;
 
+   procedure Debug_Bt (Instance : Block_Instance_Acc)
+   is
+      Inst : Block_Instance_Acc;
+   begin
+      Inst := Instance;
+      while Inst /= null loop
+         Disp_A_Frame (Inst);
+         Inst := Inst.Parent;
+      end loop;
+   end Debug_Bt;
+   pragma Unreferenced (Debug_Bt);
+
    procedure Disp_Current_Lines
    is
       use Files_Map;
@@ -1299,9 +1310,10 @@ package body Simul.Debugger is
          Put_Line ("design not yet fully elaborated");
          return;
       end if;
-      for I in Package_Instances'Range loop
-         if Package_Instances (I) /= null then
-            Put (Get_Instance_Local_Name (Package_Instances (I)));
+      for I in Global_Instances.Objects'Range loop
+         if Global_Instances.Objects (I) /= null then
+            Put (Get_Instance_Local_Name
+                   (Global_Instances.Objects (I).Instance));
             Put_Line (" [package]");
          end if;
       end loop;

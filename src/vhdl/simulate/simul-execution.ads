@@ -28,8 +28,6 @@ package Simul.Execution is
    -- If true, disp current time in assert message.
    Disp_Time_Before_Values: Boolean := False;
 
-   Current_Component : Block_Instance_Acc := null;
-
    -- State associed with each process.
    type Process_State_Type is record
       --  The process instance.
@@ -83,6 +81,12 @@ package Simul.Execution is
                                      Res : out Iir_Value_Literal_Acc;
                                      Is_Sig : out Boolean);
 
+   function Execute_Association_Expression
+     (Actual_Instance : Block_Instance_Acc;
+      Actual : Iir;
+      Formal_Instance : Block_Instance_Acc)
+     return Iir_Value_Literal_Acc;
+
    --  Return the initial value (default value) of signal name EXPR.  To be
    --  used only during (non-dynamic) elaboration.
    function Execute_Signal_Init_Value (Block : Block_Instance_Acc; Expr : Iir)
@@ -102,7 +106,7 @@ package Simul.Execution is
       Default_Severity : Natural);
 
    function Execute_Resolution_Function
-     (Block: Block_Instance_Acc; Imp : Iir; Arr : Iir_Value_Literal_Acc)
+     (Block: Block_Instance_Acc; Imp :  Iir; Arr : Iir_Value_Literal_Acc)
       return Iir_Value_Literal_Acc;
 
    function Execute_Assoc_Conversion
@@ -125,8 +129,14 @@ package Simul.Execution is
    function Execute_Low_Limit (Bounds : Iir_Value_Literal_Acc)
                               return Iir_Value_Literal_Acc;
 
+   --  Return True iff EXPR is covered by CHOICE.
+   function Is_In_Choice (Instance : Block_Instance_Acc;
+                          Choice : Iir;
+                          Expr : Iir_Value_Literal_Acc)
+                         return Boolean;
+
    function Get_Instance_By_Scope
-     (Instance: Block_Instance_Acc; Scope: Scope_Type)
+     (Instance: Block_Instance_Acc; Scope: Sim_Info_Acc)
      return Block_Instance_Acc;
 
    function Get_Instance_For_Slot (Instance: Block_Instance_Acc; Decl: Iir)

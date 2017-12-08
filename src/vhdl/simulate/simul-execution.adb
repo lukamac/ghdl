@@ -65,40 +65,59 @@ package body Simul.Execution is
                                        Stmt: Iir);
 
    function Get_Instance_By_Scope
-     (Instance: Block_Instance_Acc; Scope: Scope_Type)
+     (Instance: Block_Instance_Acc; Scope: Sim_Info_Acc)
      return Block_Instance_Acc is
    begin
       case Scope.Kind is
-         when Scope_Kind_Frame =>
+         when Kind_Block
+           | Kind_Frame
+           | Kind_Process =>
             declare
                Current : Block_Instance_Acc;
-               Last : Block_Instance_Acc;
+               --  Last : Block_Instance_Acc;
             begin
                Current := Instance;
                while Current /= null loop
                   if Current.Block_Scope = Scope then
                      return Current;
                   end if;
-                  Last := Current;
+               --  Last := Current;
                   Current := Current.Up_Block;
                end loop;
-               if Scope.Depth = 0
-                 and then Last.Block_Scope.Kind = Scope_Kind_Package
-               then
-                  --  For instantiated packages.
-                  return Last;
-               end if;
+               --  if Scope.Frame_Scope.Depth = 0
+               --    and then (Last.Block_Scope.Frame_Scope.Kind
+               --                = Scope_Kind_Package)
+               --  then
+               --     --  For instantiated packages.
+               --     return Last;
+               --  end if;
                raise Internal_Error;
             end;
-         when Scope_Kind_Package =>
-            --  Global scope (packages)
-            return Package_Instances (Scope.Pkg_Index);
-         when Scope_Kind_Component =>
-            pragma Assert (Current_Component /= null);
-            return Current_Component;
-         when Scope_Kind_None =>
-            raise Internal_Error;
-         when Scope_Kind_Pkg_Inst =>
+         when Kind_Package =>
+            if Scope.Pkg_Parent = null then
+               --  This is a scope for an uninstantiated package.
+               declare
+                  Current : Block_Instance_Acc;
+               begin
+                  Current := Instance;
+                  while Current /= null loop
+                     if Current.Uninst_Scope = Scope then
+                        return Current;
+                     end if;
+                     Current := Current.Up_Block;
+                  end loop;
+                  raise Internal_Error;
+               end;
+            else
+               --  Instantiated package.
+               declare
+                  Parent : Block_Instance_Acc;
+               begin
+                  Parent := Get_Instance_By_Scope (Instance, Scope.Pkg_Parent);
+                  return Parent.Objects (Scope.Pkg_Slot).Instance;
+               end;
+            end if;
+         when others =>
             raise Internal_Error;
       end case;
    end Get_Instance_By_Scope;
@@ -108,6 +127,16 @@ package body Simul.Execution is
    begin
       return Get_Instance_By_Scope (Instance, Get_Info (Decl).Obj_Scope);
    end Get_Instance_For_Slot;
+
+   function Get_Info_For_Scope (Scope : Iir) return Sim_Info_Acc is
+   begin
+      --  The info for an architecture is in fact the entity.
+      if Get_Kind (Scope) = Iir_Kind_Architecture_Body then
+         return Get_Info (Get_Entity (Scope));
+      else
+         return Get_Info (Scope);
+      end if;
+   end Get_Info_For_Scope;
 
    procedure Create_Right_Bound_From_Length
      (Bounds : Iir_Value_Literal_Acc; Len : Iir_Index32)
@@ -339,7 +368,7 @@ package body Simul.Execution is
       end if;
 
       Instance := Get_Instance_By_Scope
-        (Block, Get_Info (Name.Path_Instance).Frame_Scope);
+        (Block, Get_Info_For_Scope (Name.Path_Instance));
 
       loop
          case Get_Kind (Instance.Label) is
@@ -1745,8 +1774,8 @@ package body Simul.Execution is
    end String_To_Enumeration_Array_1;
 
    --  Create a literal for a string or a bit_string
-   function String_To_Enumeration_Array (Block: Block_Instance_Acc; Str: Iir)
-      return Iir_Value_Literal_Acc
+   function Execute_String_Literal (Str: Iir; Block_Type : Block_Instance_Acc)
+                                   return Iir_Value_Literal_Acc
    is
       Array_Type: constant Iir := Get_Type (Str);
       Index_Types : constant Iir_Flist := Get_Index_Subtype_List (Array_Type);
@@ -1768,7 +1797,7 @@ package body Simul.Execution is
                                Res.Val_Array.Len);
       else
          Res.Bounds.D (1) :=
-           Execute_Bounds (Block, Get_Nth_Element (Index_Types, 0));
+           Execute_Bounds (Block_Type, Get_Nth_Element (Index_Types, 0));
       end if;
 
       --  The range may not be statically constant.
@@ -1777,7 +1806,7 @@ package body Simul.Execution is
       end if;
 
       return Res;
-   end String_To_Enumeration_Array;
+   end Execute_String_Literal;
 
    --  Fill LENGTH elements of RES, starting at ORIG by steps of STEP.
    --  Use expressions from (BLOCK, AGGREGATE) to fill the elements.
@@ -2003,6 +2032,7 @@ package body Simul.Execution is
 
    function Execute_Aggregate (Block: Block_Instance_Acc;
                                Aggregate: Iir;
+                               Block_Type : Block_Instance_Acc;
                                Aggregate_Type: Iir)
                               return Iir_Value_Literal_Acc is
    begin
@@ -2013,18 +2043,37 @@ package body Simul.Execution is
                Res : Iir_Value_Literal_Acc;
             begin
                Res := Create_Array_Bounds_From_Type
-                 (Block, Aggregate_Type, True);
+                 (Block_Type, Aggregate_Type, True);
                Fill_Array_Aggregate (Block, Aggregate, Res);
                return Res;
             end;
          when Iir_Kind_Record_Type_Definition
            | Iir_Kind_Record_Subtype_Definition =>
-            return Execute_Record_Aggregate
-              (Block, Aggregate, Aggregate_Type);
+            return Execute_Record_Aggregate (Block, Aggregate, Aggregate_Type);
          when others =>
             Error_Kind ("execute_aggregate", Aggregate_Type);
       end case;
    end Execute_Aggregate;
+
+   function Execute_Association_Expression
+     (Actual_Instance : Block_Instance_Acc;
+      Actual : Iir;
+      Formal_Instance : Block_Instance_Acc)
+     return Iir_Value_Literal_Acc
+   is
+   begin
+      case Get_Kind (Actual) is
+         when Iir_Kind_String_Literal8 =>
+            return Execute_String_Literal (Actual, Formal_Instance);
+         when Iir_Kind_Aggregate =>
+            return Execute_Aggregate
+              (Actual_Instance, Actual, Formal_Instance, Get_Type (Actual));
+         when others =>
+            null;
+      end case;
+      return Execute_Expression (Actual_Instance, Actual);
+   end Execute_Association_Expression;
+
 
    function Execute_Simple_Aggregate (Block: Block_Instance_Acc; Aggr : Iir)
                                      return Iir_Value_Literal_Acc
@@ -2443,7 +2492,7 @@ package body Simul.Execution is
       if Get_Kind (Expr) = Iir_Kind_Aggregate
         and then not Is_Fully_Constrained_Type (Get_Type (Expr))
       then
-         return Execute_Aggregate (Block, Expr, Expr_Type);
+         return Execute_Aggregate (Block, Expr, Block, Expr_Type);
       else
          Res := Execute_Expression (Block, Expr);
          Implicit_Array_Conversion (Block, Res, Expr_Type, Expr);
@@ -2893,7 +2942,7 @@ package body Simul.Execution is
             return Execute_Expression (Block, Get_Named_Entity (Expr));
 
          when Iir_Kind_Aggregate =>
-            return Execute_Aggregate (Block, Expr, Get_Type (Expr));
+            return Execute_Aggregate (Block, Expr, Block, Get_Type (Expr));
          when Iir_Kind_Simple_Aggregate =>
             return Execute_Simple_Aggregate (Block, Expr);
 
@@ -2984,7 +3033,7 @@ package body Simul.Execution is
               (Ghdl_I64 (Evaluation.Get_Physical_Value (Expr)));
 
          when Iir_Kind_String_Literal8 =>
-            return String_To_Enumeration_Array (Block, Expr);
+            return Execute_String_Literal (Expr, Block);
 
          when Iir_Kind_Null_Literal =>
             return Null_Lit;
@@ -3246,17 +3295,10 @@ package body Simul.Execution is
                                         Imp : Iir)
                                        return Block_Instance_Acc
    is
-      Func_Info : constant Sim_Info_Acc := Get_Info (Imp);
-
-      subtype Block_Type is Block_Instance_Type (Func_Info.Nbr_Objects);
-      function To_Block_Instance_Acc is new
-        Ada.Unchecked_Conversion (System.Address, Block_Instance_Acc);
-      function Alloc_Block_Instance is new
-        Alloc_On_Pool_Addr (Block_Type);
+      Parent : constant Iir := Get_Parent (Imp);
 
       Up_Block: Block_Instance_Acc;
       Up_Info : Sim_Info_Acc;
-      Res : Block_Instance_Acc;
 
       Origin : Iir;
       Label : Iir;
@@ -3268,48 +3310,61 @@ package body Simul.Execution is
          Up_Block := Prot_Obj;
          Label := Imp;
       else
-         Up_Info := Get_Info (Get_Parent (Imp));
-         Up_Block := Get_Instance_By_Scope (Instance, Up_Info.Frame_Scope);
+         Up_Info := Get_Info_For_Scope (Parent);
+         Up_Block := Get_Instance_By_Scope (Instance, Up_Info);
 
-         Origin := Sem_Inst.Get_Origin (Imp);
-         if Origin /= Null_Iir then
+         if Up_Block.Uninst_Scope /= null then
+            Origin := Sem_Inst.Get_Origin (Imp);
+            pragma Assert (Origin /= Null_Iir);
             --  Call to a subprogram of an instantiated package.
             --  For a generic package, only the spec is instantiated, the body
             --  is shared by all the instances.
 
             --  Execute code of the 'shared' body
             Label := Origin;
-
-            --  Get the real instance for package interface.
-            if Up_Info.Kind = Kind_Environment then
-               Up_Block := Environment_Table.Table
-                 (Up_Block.Objects (Up_Info.Env_Slot).Environment);
-            end if;
          else
             Label := Imp;
          end if;
       end if;
 
-      Res := To_Block_Instance_Acc
-        (Alloc_Block_Instance
-           (Instance_Pool,
-            Block_Instance_Type'(Max_Objs => Func_Info.Nbr_Objects,
-                                 Id => No_Block_Instance_Id,
-                                 Block_Scope => Get_Info (Label).Frame_Scope,
-                                 Up_Block => Up_Block,
-                                 Label => Label,
-                                 Stmt => Null_Iir,
-                                 Parent => Instance,
-                                 Children => null,
-                                 Brother => null,
-                                 Ports_Map => Null_Iir,
-                                 Marker => Empty_Marker,
-                                 Objects => (others => null),
-                                 Elab_Objects => 0,
-                                 In_Wait_Flag => False,
-                                 Actuals_Ref => null,
-                                 Result => null)));
-      return Res;
+      --  Extract the info from the body, as it is complete (has slot for
+      --  internal declarations).  Usually, body and spec share the same info,
+      --  but there are exceptions: there can be multiple spec for the same
+      --  body for shared generic packages.
+      declare
+         Bod : constant Iir := Get_Subprogram_Body (Label);
+         Func_Info : constant Sim_Info_Acc := Get_Info (Bod);
+
+         subtype Block_Type is Block_Instance_Type (Func_Info.Nbr_Objects);
+         function To_Block_Instance_Acc is new
+           Ada.Unchecked_Conversion (System.Address, Block_Instance_Acc);
+         function Alloc_Block_Instance is new
+           Alloc_On_Pool_Addr (Block_Type);
+
+         Res : Block_Instance_Acc;
+      begin
+         Res := To_Block_Instance_Acc
+           (Alloc_Block_Instance
+              (Instance_Pool,
+               Block_Instance_Type'(Max_Objs => Func_Info.Nbr_Objects,
+                                    Id => No_Block_Instance_Id,
+                                    Block_Scope => Get_Info (Label),
+                                    Uninst_Scope => null,
+                                    Up_Block => Up_Block,
+                                    Label => Label,
+                                    Stmt => Null_Iir,
+                                    Parent => Instance,
+                                    Children => null,
+                                    Brother => null,
+                                    Ports_Map => Null_Iir,
+                                    Marker => Empty_Marker,
+                                    Objects => (others => null),
+                                    Elab_Objects => 0,
+                                    In_Wait_Flag => False,
+                                    Actuals_Ref => null,
+                                    Result => null)));
+         return Res;
+      end;
    end Create_Subprogram_Instance;
 
    -- Destroy a dynamic block_instance.
@@ -3995,6 +4050,8 @@ package body Simul.Execution is
          Disconnect_Signal (Rdest);
          Release (Marker, Expr_Pool);
          return;
+      elsif Get_Kind (Wf) = Iir_Kind_Unaffected_Waveform then
+         return;
       end if;
 
       Transactions.Stmt := Stmt;
@@ -4187,11 +4244,10 @@ package body Simul.Execution is
       Release (Marker, Expr_Pool);
    end Execute_Failed_Assertion;
 
-   function Is_In_Choice
-     (Instance: Block_Instance_Acc;
-      Choice: Iir;
-      Expr: Iir_Value_Literal_Acc)
-      return Boolean
+   function Is_In_Choice (Instance : Block_Instance_Acc;
+                          Choice : Iir;
+                          Expr : Iir_Value_Literal_Acc)
+                         return Boolean
    is
       Res : Boolean;
    begin
@@ -4493,6 +4549,7 @@ package body Simul.Execution is
    is
       Instance : constant Block_Instance_Acc := Proc.Instance;
       Stmt : constant Iir := Instance.Stmt;
+      Expr : constant Iir := Get_Expression (Stmt);
       Value: Iir_Value_Literal_Acc;
       Assoc: Iir;
       Stmt_Chain : Iir;
@@ -4500,8 +4557,23 @@ package body Simul.Execution is
    begin
       Mark (Marker, Expr_Pool);
 
-      Value := Execute_Expression (Instance, Get_Expression (Stmt));
+      Value := Execute_Expression (Instance, Expr);
       Assoc := Get_Case_Statement_Alternative_Chain (Stmt);
+      if Get_Type_Staticness (Get_Type (Expr)) /= Locally
+        and then Get_Kind (Assoc) = Iir_Kind_Choice_By_Expression
+      then
+         declare
+            Choice_Type : constant Iir :=
+              Get_Type (Get_Choice_Expression (Assoc));
+            Choice_Len : Iir_Int64;
+         begin
+            Choice_Len := Evaluation.Eval_Discrete_Type_Length
+              (Get_String_Type_Bound_Type (Choice_Type));
+            if Choice_Len /= Iir_Int64 (Value.Bounds.D (1).Length) then
+               Error_Msg_Constraint (Expr);
+            end if;
+         end;
+      end if;
 
       while Assoc /= Null_Iir loop
          if not Get_Same_Alternative_Flag (Assoc) then

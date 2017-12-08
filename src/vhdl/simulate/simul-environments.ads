@@ -113,7 +113,7 @@ package Simul.Environments is
       Iir_Value_Signal,
       Iir_Value_Terminal,
       Iir_Value_Quantity,
-      Iir_Value_Environment);
+      Iir_Value_Instance);
 
    --  Uniq identifier for scalar signal.  First identifier is 'First + 1.
    type Signal_Index_Type is new Natural;
@@ -122,7 +122,6 @@ package Simul.Environments is
    type Protected_Index_Type is new Natural;
    type Quantity_Index_Type is new Natural;
    type Terminal_Index_Type is new Natural;
-   type Environment_Index_Type is new Natural;
 
    --  Scalar values.  Only these ones can be signals.
    subtype Iir_Value_Scalars is
@@ -200,8 +199,8 @@ package Simul.Environments is
             Quantity : Quantity_Index_Type;
          when Iir_Value_Terminal =>
             Terminal : Terminal_Index_Type;
-         when Iir_Value_Environment =>
-            Environment : Environment_Index_Type;
+         when Iir_Value_Instance =>
+            Instance : Block_Instance_Acc;
          when Iir_Value_Range =>
             Dir: Iir_Direction;
             Length : Iir_Index32;
@@ -211,42 +210,88 @@ package Simul.Environments is
    end record;
 
    type Object_Slot_Type is new Natural;
+
+   --  This slot is not used.
+   Invalid_Object_Slot : constant Object_Slot_Type := 0;
+
    subtype Parameter_Slot_Type is Object_Slot_Type range 0 .. 2**15;
 
    type Pkg_Index_Type is new Natural;
-
-   -- Scope corresponding to an object.
-   type Scope_Kind_Type is
-     (
-      --  For a package, the depth is
-      Scope_Kind_Package,
-      Scope_Kind_Component,
-      Scope_Kind_Frame,
-      Scope_Kind_Pkg_Inst,
-      Scope_Kind_None
-     );
-   type Scope_Depth_Type is range 0 .. 2**15;
-   type Scope_Type (Kind : Scope_Kind_Type := Scope_Kind_None) is record
-      case Kind is
-         when Scope_Kind_Package =>
-            Pkg_Index : Pkg_Index_Type;
-         when Scope_Kind_Component =>
-            null;
-         when Scope_Kind_Frame =>
-            Depth : Scope_Depth_Type;
-         when Scope_Kind_Pkg_Inst =>
-            Pkg_Param : Parameter_Slot_Type;
-            --  Pkg_Parent : Sim_Info_Acc;
-         when Scope_Kind_None =>
-            null;
-      end case;
-   end record;
 
    type Block_Instance_Id is new Natural;
    No_Block_Instance_Id : constant Block_Instance_Id := 0;
 
    type Objects_Array is array (Object_Slot_Type range <>) of
      Iir_Value_Literal_Acc;
+
+   --  For Kind_Extra: a number.  Kind_Extra is not used by annotations, and
+   --  is free for another pass like preelab.
+   type Extra_Slot_Type is new Natural;
+
+   -- The annotation depends on the kind of the node.
+   type Sim_Info_Kind is
+     (Kind_Block, Kind_Process, Kind_Frame, Kind_Package,
+      Kind_Scalar_Type, Kind_File_Type,
+      Kind_Object, Kind_Signal,
+      Kind_File,
+      Kind_Terminal, Kind_Quantity,
+      Kind_PSL,
+      Kind_Extra);
+
+   type Instance_Slot_Type is new Integer;
+   Invalid_Instance_Slot : constant Instance_Slot_Type := -1;
+
+   type Sim_Info_Type (Kind : Sim_Info_Kind);
+   type Sim_Info_Acc is access all Sim_Info_Type;
+
+   -- Annotation for an iir node in order to be able to simulate it.
+   type Sim_Info_Type (Kind: Sim_Info_Kind) is record
+      case Kind is
+         when Kind_Block
+           | Kind_Frame
+           | Kind_Process
+           | Kind_Package =>
+            --  Number of objects/signals.
+            Nbr_Objects : Object_Slot_Type;
+
+            case Kind is
+               when Kind_Block =>
+                  --  Slot number in the parent (for blocks).
+                  Inst_Slot : Instance_Slot_Type;
+
+                  --  Number of children (blocks, generate, instantiation).
+                  Nbr_Instances : Instance_Slot_Type;
+
+               when Kind_Package =>
+                  Pkg_Slot : Object_Slot_Type;
+                  Pkg_Parent : Sim_Info_Acc;
+
+               when others =>
+                  null;
+            end case;
+
+         when Kind_Object
+           | Kind_Signal
+           | Kind_File
+           | Kind_Terminal
+           | Kind_Quantity
+           | Kind_PSL =>
+            --  Block in which this object is declared in.
+            Obj_Scope : Sim_Info_Acc;
+
+            --  Variable index in the block.
+            Slot: Object_Slot_Type;
+
+         when Kind_Scalar_Type =>
+            Scalar_Mode : Iir_Value_Kind;
+
+         when Kind_File_Type =>
+            File_Signature : String_Acc;
+
+         when Kind_Extra =>
+            Extra_Slot : Extra_Slot_Type;
+      end case;
+   end record;
 
    type Block_Instance_Type (Max_Objs : Object_Slot_Type) is record
       --  Flag for wait statement: true if not yet executed.
@@ -257,7 +302,8 @@ package Simul.Environments is
 
       -- Useful informations for a dynamic block (ie, a frame).
       -- The scope level and an access to the block of upper scope level.
-      Block_Scope : Scope_Type;
+      Block_Scope : Sim_Info_Acc;
+      Uninst_Scope : Sim_Info_Acc;
       Up_Block : Block_Instance_Acc;
 
       --  Block, architecture, package, process, component instantiation for
@@ -326,8 +372,8 @@ package Simul.Environments is
                                   return Iir_Value_Literal_Acc;
    function Create_Quantity_Value (Quantity : Quantity_Index_Type)
                                   return Iir_Value_Literal_Acc;
-   function Create_Environment_Value (Env : Environment_Index_Type)
-                                     return Iir_Value_Literal_Acc;
+   function Create_Instance_Value (Inst : Block_Instance_Acc)
+                                  return Iir_Value_Literal_Acc;
 
    function Create_B1_Value (Val : Ghdl_B1) return Iir_Value_Literal_Acc;
    function Create_E8_Value (Val : Ghdl_E8) return Iir_Value_Literal_Acc;

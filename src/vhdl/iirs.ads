@@ -4133,13 +4133,13 @@ package Iirs is
       Iir_Kind_Subtype_Declaration,
       Iir_Kind_Nature_Declaration,
       Iir_Kind_Subnature_Declaration,
+      Iir_Kind_Entity_Declaration,
+      Iir_Kind_Configuration_Declaration,
+      Iir_Kind_Context_Declaration,
       Iir_Kind_Package_Declaration,
       Iir_Kind_Package_Instantiation_Declaration,
       Iir_Kind_Package_Body,
-      Iir_Kind_Configuration_Declaration,
-      Iir_Kind_Entity_Declaration,
       Iir_Kind_Architecture_Body,
-      Iir_Kind_Context_Declaration,
       Iir_Kind_Package_Header,
       Iir_Kind_Unit_Declaration,
       Iir_Kind_Library_Declaration,
@@ -4372,9 +4372,17 @@ package Iirs is
    subtype Iir_Out_Modes is Iir_Mode range Iir_Out_Mode .. Iir_Inout_Mode;
    subtype Iir_Parameter_Modes is Iir_Mode range Iir_Out_Mode .. Iir_In_Mode;
 
-   type Iir_Delay_Mechanism is (Iir_Inertial_Delay, Iir_Transport_Delay);
+   type Iir_Delay_Mechanism is
+     (
+      Iir_Inertial_Delay,
+      Iir_Transport_Delay
+     );
 
-   type Iir_Direction is (Iir_To, Iir_Downto);
+   type Iir_Direction is
+     (
+      Iir_To,
+      Iir_Downto
+     );
 
    --  LRM93 2.7 (conformance rules).
    --  To keep this simple, the layout is stored as a bit-string.
@@ -4907,18 +4915,25 @@ package Iirs is
    -- * comments line
    -- * the last line must be the highest bound of the range, followed by ";"
 
---   subtype Iir_Kinds_List is Iir_Kind range
---     Iir_Kind_List ..
---     Iir_Kind_Callees_List;
-
-   subtype Iir_Kinds_Library_Unit_Declaration is Iir_Kind range
-     Iir_Kind_Package_Declaration ..
+   subtype Iir_Kinds_Library_Unit is Iir_Kind range
+     Iir_Kind_Entity_Declaration ..
+   --Iir_Kind_Configuration_Declaration
+   --Iir_Kind_Context_Declaration
+   --Iir_Kind_Package_Declaration
    --Iir_Kind_Package_Instantiation_Declaration
    --Iir_Kind_Package_Body
+     Iir_Kind_Architecture_Body;
+
+   subtype Iir_Kinds_Primary_Unit is Iir_Kind range
+     Iir_Kind_Entity_Declaration ..
    --Iir_Kind_Configuration_Declaration
-   --Iir_Kind_Entity_Declaration
-   --Iir_Kind_Architecture_Body
-     Iir_Kind_Context_Declaration;
+   --Iir_Kind_Context_Declaration
+   --Iir_Kind_Package_Declaration
+     Iir_Kind_Package_Instantiation_Declaration;
+
+   subtype Iir_Kinds_Secondary_Unit is Iir_Kind range
+     Iir_Kind_Package_Body ..
+     Iir_Kind_Architecture_Body;
 
    subtype Iir_Kinds_Package_Declaration is Iir_Kind range
      Iir_Kind_Package_Declaration ..
@@ -5472,15 +5487,14 @@ package Iirs is
    type Date_Type is new Nat32;
 
    --  The unit is obsoleted (ie replaced) by a more recently analyzed design
-   --  unit.another design unit.
+   --  unit.
    --  If another design unit depends (directly or not) on an obseleted design
    --  unit, it is also obsolete, and cannot be defined.
    Date_Obsolete      : constant Date_Type := 0;
+   --  A unit with the same name (could also be the same unit) is being
+   --  analyzed.  Used to detect circular dependencies.
+   Date_Replacing     : constant Date_Type := 1;
    --  The unit was not analyzed.
-   Date_Not_Analyzed  : constant Date_Type := 1;
-   --  The unit has been analyzed but it has bad dependences.
-   Date_Bad_Analyze   : constant Date_Type := 2;
-   --  The unit has been parsed but not analyzed.
    Date_Parsed        : constant Date_Type := 4;
    --  The unit is being analyzed.
    Date_Analyzing     : constant Date_Type := 5;

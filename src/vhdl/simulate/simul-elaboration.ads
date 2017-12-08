@@ -21,7 +21,6 @@ with Types; use Types;
 with Iirs; use Iirs;
 with Simul.Environments; use Simul.Environments;
 with Grt.Types; use Grt.Types;
-with Simul.Annotations; use Simul.Annotations;
 
 --  This package elaborates design hierarchy.
 
@@ -78,16 +77,11 @@ package Simul.Elaboration is
    procedure Create_Object (Instance : Block_Instance_Acc; Decl : Iir);
    procedure Create_Signal (Instance : Block_Instance_Acc; Decl : Iir);
 
+   Global_Instances : Block_Instance_Acc;
    Top_Instance: Block_Instance_Acc;
 
    type Block_Instance_Acc_Array is array (Instance_Slot_Type range <>) of
      Block_Instance_Acc;
-
-   type Package_Instances_Array is array (Pkg_Index_Type range <>) of
-     Block_Instance_Acc;
-   type Package_Instances_Array_Acc is access Package_Instances_Array;
-
-   Package_Instances : Package_Instances_Array_Acc;
 
    --  Disconnections.  For each disconnection specification, the elaborator
    --  adds an entry in the table.
@@ -158,12 +152,6 @@ package Simul.Elaboration is
    package Protected_Table is new Tables
      (Table_Component_Type => Block_Instance_Acc,
       Table_Index_Type => Protected_Index_Type,
-      Table_Low_Bound => 1,
-      Table_Initial => 2);
-
-   package Environment_Table is new Tables
-     (Table_Component_Type => Block_Instance_Acc,
-      Table_Index_Type => Environment_Index_Type,
       Table_Low_Bound => 1,
       Table_Initial => 2);
 
