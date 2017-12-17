@@ -669,7 +669,7 @@ package body Simul.Elaboration is
            | Iir_Kind_Record_Subtype_Definition =>
             declare
                List : constant Iir_Flist :=
-                 Get_Elements_Declaration_List (Get_Base_Type (Decl));
+                 Get_Elements_Declaration_List (Decl);
                El : Iir_Element_Declaration;
             begin
                Res := Create_Record_Value
@@ -848,11 +848,7 @@ package body Simul.Elaboration is
         (Execute_Expression (Instance, Get_Left_Limit (Rc)),
          Execute_Expression (Instance, Get_Right_Limit (Rc)),
          Get_Direction (Rc));
-      --  Check constraints.
-      if not Is_Null_Range (Val) then
-         Check_Constraints (Instance, Val.Left, Get_Type (Rc), Rc);
-         Check_Constraints (Instance, Val.Right, Get_Type (Rc), Rc);
-      end if;
+      Check_Range_Constraints (Instance, Val, Rc, Rc);
       Instance.Objects (Range_Info.Slot) := Unshare (Val, Instance_Pool);
    end Elaborate_Range_Expression;
 

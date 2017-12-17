@@ -122,11 +122,15 @@ package body Simul.Execution is
       end case;
    end Get_Instance_By_Scope;
 
-   function Get_Instance_For_Slot (Instance: Block_Instance_Acc; Decl: Iir)
-                                  return Block_Instance_Acc is
+   function Get_Instance_Object (Instance: Block_Instance_Acc; Obj : Iir)
+                                return Iir_Value_Literal_Acc
+   is
+      Info : constant Sim_Info_Acc := Get_Info (Obj);
+      Obj_Inst : Block_Instance_Acc;
    begin
-      return Get_Instance_By_Scope (Instance, Get_Info (Decl).Obj_Scope);
-   end Get_Instance_For_Slot;
+      Obj_Inst := Get_Instance_By_Scope (Instance, Info.Obj_Scope);
+      return Obj_Inst.Objects (Info.Slot);
+   end Get_Instance_Object;
 
    function Get_Info_For_Scope (Scope : Iir) return Sim_Info_Acc is
    begin
@@ -653,6 +657,10 @@ package body Simul.Execution is
             Eval_Right;
 
             declare
+               --  Type of the index.
+               Idx_Type : constant Iir :=
+                 Get_Nth_Element (Get_Index_Subtype_List (Res_Type), 0);
+
                -- Array length of the result.
                Len: Iir_Index32;
 
@@ -710,10 +718,10 @@ package body Simul.Execution is
                   --  Create the array result.
                   Result := Create_Array_Value (Len, 1);
                   Result.Bounds.D (1) := Create_Bounds_From_Length
-                    (Block,
-                     Get_Nth_Element (Get_Index_Subtype_List (Res_Type), 0),
-                     Len);
+                    (Block, Idx_Type, Len);
                end if;
+               Check_Range_Constraints
+                 (Block, Result.Bounds.D (1), Idx_Type, Expr);
 
                -- Fill the result: left.
                case Func is
@@ -1508,19 +1516,30 @@ package body Simul.Execution is
    is
       Imp : constant Iir := Get_Implementation (Stmt);
       Assoc_Chain : constant Iir := Get_Parameter_Association_Chain (Stmt);
+      Inter_Chain : constant Iir := Get_Interface_Declaration_Chain (Imp);
       Assoc: Iir;
+      Formal : Iir;
+      Val : Iir;
       Args: Iir_Value_Literal_Array (0 .. 3);
-      Inter_Chain : Iir;
       Expr_Mark : Mark_Type;
    begin
       Mark (Expr_Mark, Expr_Pool);
       Assoc := Assoc_Chain;
+      Formal := Inter_Chain;
       for I in Iir_Index32 loop
          exit when Assoc = Null_Iir;
-         Args (I) := Execute_Expression (Block, Get_Actual (Assoc));
+         case Get_Kind (Assoc) is
+            when Iir_Kind_Association_Element_By_Expression =>
+               Val := Get_Actual (Assoc);
+            when Iir_Kind_Association_Element_Open =>
+               Val := Get_Default_Value (Formal);
+            when others =>
+               raise Internal_Error;
+         end case;
+         Args (I) := Execute_Expression (Block, Val);
          Assoc := Get_Chain (Assoc);
+         Formal := Get_Chain (Formal);
       end loop;
-      Inter_Chain := Get_Interface_Declaration_Chain (Imp);
       case Get_Implicit_Definition (Imp) is
          when Iir_Predefined_Deallocate =>
             if Args (0).Val_Access /= null then
@@ -2278,8 +2297,7 @@ package body Simul.Execution is
                      Execute_Expression (Block, Get_Right_Limit (Prefix)),
                      Get_Direction (Prefix));
                elsif Info.Kind = Kind_Object then
-                  Bound := Get_Instance_For_Slot
-                    (Block, Prefix).Objects (Info.Slot);
+                  Bound := Get_Instance_Object (Block, Prefix);
                else
                   raise Internal_Error;
                end if;
@@ -2317,6 +2335,9 @@ package body Simul.Execution is
 
          when Iir_Kinds_Denoting_Name =>
             return Execute_Bounds (Block, Get_Named_Entity (Prefix));
+
+         when Iir_Kind_Subtype_Attribute =>
+            return Execute_Bounds (Block, Get_Type (Prefix));
 
          when others =>
             -- Error_Kind ("execute_bounds", Get_Kind (Prefix));
@@ -2592,9 +2613,7 @@ package body Simul.Execution is
                                      Expr: Iir;
                                      Base : Iir_Value_Literal_Acc;
                                      Res : out Iir_Value_Literal_Acc;
-                                     Is_Sig : out Boolean)
-   is
-      Slot_Block: Block_Instance_Acc;
+                                     Is_Sig : out Boolean) is
    begin
       --  Default value
       Is_Sig := False;
@@ -2611,8 +2630,7 @@ package body Simul.Execution is
             if Base /= null then
                Res := Base;
             else
-               Slot_Block := Get_Instance_For_Slot (Block, Expr);
-               Res := Slot_Block.Objects (Get_Info (Expr).Slot);
+               Res := Get_Instance_Object (Block, Expr);
             end if;
 
          when Iir_Kind_Object_Alias_Declaration =>
@@ -2621,8 +2639,7 @@ package body Simul.Execution is
             if Base /= null then
                Res := Base;
             else
-               Slot_Block := Get_Instance_For_Slot (Block, Expr);
-               Res := Slot_Block.Objects (Get_Info (Expr).Slot);
+               Res := Get_Instance_Object (Block, Expr);
             end if;
 
          when Iir_Kind_Interface_Constant_Declaration
@@ -2638,12 +2655,7 @@ package body Simul.Execution is
             if Base /= null then
                Res := Base;
             else
-               declare
-                  Info : constant Sim_Info_Acc := Get_Info (Expr);
-               begin
-                  Slot_Block := Get_Instance_By_Scope (Block, Info.Obj_Scope);
-                  Res := Slot_Block.Objects (Info.Slot);
-               end;
+               Res := Get_Instance_Object (Block, Expr);
             end if;
 
          when Iir_Kind_Indexed_Name =>
@@ -2808,7 +2820,7 @@ package body Simul.Execution is
                if Unit = Null_Iir then
                   Error_Msg_Exec ("incorrect unit name", Expr);
                end if;
-               Mult := Ghdl_I64 (Get_Value (Get_Physical_Unit (Unit)));
+               Mult := Ghdl_I64 (Get_Value (Get_Physical_Literal (Unit)));
 
                Str_Bnd.Dim_1.Length := Lit_End;
                if Is_Real then
@@ -3289,6 +3301,20 @@ package body Simul.Execution is
         Unshare (Val, Instance_Pool);
    end Execute_Monadic_Association;
 
+   --  Like Get_Subprogram_Body, but also works for instances, where
+   --  instantiated nodes have no bodies.
+   --  FIXME: maybe fix the issue directly in Sem_Inst ?
+   function Get_Subprogram_Body_Origin (Spec : Iir) return Iir
+   is
+      Orig : constant Iir := Sem_Inst.Get_Origin (Spec);
+   begin
+      if Orig /= Null_Iir then
+         return Get_Subprogram_Body_Origin (Orig);
+      else
+         return Get_Subprogram_Body (Spec);
+      end if;
+   end Get_Subprogram_Body_Origin;
+
    --  Create a block instance for subprogram IMP.
    function Create_Subprogram_Instance (Instance : Block_Instance_Acc;
                                         Prot_Obj : Block_Instance_Acc;
@@ -3296,6 +3322,7 @@ package body Simul.Execution is
                                        return Block_Instance_Acc
    is
       Parent : constant Iir := Get_Parent (Imp);
+      Bod : Iir;
 
       Up_Block: Block_Instance_Acc;
       Up_Info : Sim_Info_Acc;
@@ -3303,8 +3330,14 @@ package body Simul.Execution is
       Origin : Iir;
       Label : Iir;
    begin
-      pragma Assert (Get_Kind (Imp) in Iir_Kinds_Subprogram_Declaration
-                       or else Get_Kind (Imp) = Iir_Kind_Protected_Type_Body);
+      case Get_Kind (Imp) is
+         when Iir_Kinds_Subprogram_Declaration =>
+            Bod := Get_Subprogram_Body_Origin (Imp);
+         when Iir_Kind_Protected_Type_Body =>
+            Bod := Imp;
+         when others =>
+            Error_Kind ("create_subprogram_instance", Imp);
+      end case;
 
       if Prot_Obj /= null then
          Up_Block := Prot_Obj;
@@ -3332,7 +3365,6 @@ package body Simul.Execution is
       --  but there are exceptions: there can be multiple spec for the same
       --  body for shared generic packages.
       declare
-         Bod : constant Iir := Get_Subprogram_Body (Label);
          Func_Info : constant Sim_Info_Acc := Get_Info (Bod);
 
          subtype Block_Type is Block_Instance_Type (Func_Info.Nbr_Objects);
@@ -3871,6 +3903,17 @@ package body Simul.Execution is
       Value := Ref_Value;
    end Implicit_Array_Conversion;
 
+   procedure Check_Range_Constraints (Instance : Block_Instance_Acc;
+                                      Rng : Iir_Value_Literal_Acc;
+                                      Rng_Type : Iir;
+                                      Loc : Iir) is
+   begin
+      if not Is_Null_Range (Rng) then
+         Check_Constraints (Instance, Rng.Left, Get_Type (Rng_Type), Loc);
+         Check_Constraints (Instance, Rng.Right, Get_Type (Rng_Type), Loc);
+      end if;
+   end Check_Range_Constraints;
+
    procedure Check_Array_Constraints
      (Instance: Block_Instance_Acc;
       Value: Iir_Value_Literal_Acc;
@@ -4166,34 +4209,33 @@ package body Simul.Execution is
       -- The error message consists of at least:
 
       -- 4: name of the design unit containing the assertion.
-      Put (Standard_Error, Disp_Location (Stmt));
+      Put (Standard_Output, Disp_Location (Stmt));
+
+      Put (Standard_Output, ":@");
+      Grt.Astdio.Put_Time (Grt.Stdio.stdout, Current_Time);
 
       -- 1: an indication that this message is from an assertion.
-      Put (Standard_Error, '(');
-      Put (Standard_Error, Msg);
-      Put (Standard_Error, ' ');
+      Put (Standard_Output, ":(");
+      Put (Standard_Output, Msg);
+      Put (Standard_Output, ' ');
 
       -- 2: the value of the severity level.
       case Severity is
          when 0 =>
-            Put (Standard_Error, "note");
+            Put (Standard_Output, "note");
          when 1 =>
-            Put (Standard_Error, "warning");
+            Put (Standard_Output, "warning");
          when 2 =>
-            Put (Standard_Error, "error");
+            Put (Standard_Output, "error");
          when 3 =>
-            Put (Standard_Error, "failure");
+            Put (Standard_Output, "failure");
          when others =>
             Error_Internal (Null_Iir, "execute_failed_assertion");
       end case;
-      if Disp_Time_Before_Values then
-         Put (Standard_Error, " at ");
-         Grt.Astdio.Put_Time (Grt.Stdio.stderr, Current_Time);
-      end if;
-      Put (Standard_Error, "): ");
+      Put (Standard_Output, "): ");
 
       -- 3: the value of the message string.
-      Put_Line (Standard_Error, Report);
+      Put_Line (Standard_Output, Report);
 
       -- Stop execution if the severity is too high.
       if Severity >= Grt.Options.Severity_Level then
@@ -4644,8 +4686,7 @@ package body Simul.Execution is
       Release (Proc.Instance.Marker, Instance_Pool.all);
    end Finish_Procedure_Frame;
 
-   procedure Execute_If_Statement
-     (Proc : Process_State_Acc; Stmt: Iir_Wait_Statement)
+   procedure Execute_If_Statement (Proc : Process_State_Acc; Stmt : Iir)
    is
       Clause: Iir;
       Cond: Boolean;

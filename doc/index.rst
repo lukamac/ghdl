@@ -1,6 +1,8 @@
 .. include:: shields.inc
 
-|SHIELD:gh-logo| |SHIELD:gitter| |SHIELD:code-lic| |SHIELD:doc-lic| |br| |SHIELD:travis-ci| |SHIELD:appveyor| |SHIELD:tag| |SHIELD:release|
+.. only:: html
+
+   |SHIELD:gh-logo| |SHIELD:gitter| |SHIELD:code-lic| |SHIELD:doc-lic| |SHIELD:travis-ci| |SHIELD:appveyor| |SHIELD:release|
 
 ------------------------------------
 
@@ -16,6 +18,9 @@ LRM) is a plus.
 
    News
    ****
+
+   14.12.2017 - GHDL 0.35 was released.
+   ====================================
 
    15.08.2017 - GHDL 0.34 was released.
    ====================================
