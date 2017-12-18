@@ -71,6 +71,7 @@ Param(
 	[switch]$Compile,
 		[switch]$Compile_GHDL,
 		[switch]$Compile_Libraries,
+		[switch]$Release = $false,
 
 	# Create an installer package
 	[switch]$Package,
@@ -370,6 +371,7 @@ else
 		$Script_Parameters =  @(
 			'-All',
 			'-Hosted',
+			'-Release:$Release',
 			'-Verbose:$EnableVerbose',
 			'-Debug:$EnableDebug'
 		)
