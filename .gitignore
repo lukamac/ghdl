@@ -11,7 +11,7 @@ b~*.ad?
 
 testsuite/get_entities
 
-# Generated files on windows.
+# Generated directories on Windows
 build/
 
 # Generated directories on Linux
