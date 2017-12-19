@@ -44,16 +44,12 @@ if [ "$IMAGE" = "" ]; then
 fi
 
 
-echo "travis_fold:start:patch_version"
+echo "travis_fold:start:fetch"
 # The command 'git describe' (used for version) needs the history. Get it.
 # But the following command fails if the repository is complete.
 git fetch --unshallow || true
 
-# Build version.tmp and replace version.in with it (so that the version is
-# correctly set).
-make -f Makefile.in srcdir=. version.tmp
-cp version.tmp src/version.in
-echo "travis_fold:end:patch_version"
+echo "travis_fold:end:fetch"
 
 
 # Compute package name
@@ -67,15 +63,17 @@ elif expr "$TRAVIS_TAG" : 'v[0-9].*' > /dev/null; then
     # Remove leading 'v' in tags in the filenames.
     PKG_TAG="$(echo $TRAVIS_TAG | cut -c2-)"
 else
+    # Regular tag (like snapshots), nothing to change.
     PKG_TAG="$TRAVIS_TAG"
 fi
 
+# Extract from IMAGE (defined in .travis.yml)
 IFS='+' read -ra REFS <<< "$IMAGE"
-DDIST=${REFS[0]}
-DBLD=${REFS[1]}
-DGPL=${REFS[2]}
+DDIST=${REFS[0]}  # Linux distro (eg: ubuntuXX, fedoraXX)
+DBLD=${REFS[1]}   # Build/backend (eg: mcode, llvm)
+DGPL=${REFS[2]}   # GPL or not
 
-PKG_NAME="ghdl-${PKG_TAG}-${DBLD}-${DDIST}"
+PKG_NAME="ghdl-${PKG_TAG}-${DDIST}-${DBLD}"
 BUILD_CMD_OPTS="$ENABLECOLOR -b $DBLD"
 if [ "$DGPL" = "gpl" ]; then
     BUILD_CMD_OPTS="$BUILD_CMD_OPTS --gpl"
@@ -96,6 +94,14 @@ if [ "$TRAVIS_OS_NAME" = "osx" ]; then
     bash -c "${scriptdir}/build.sh $BUILD_CMD_OPTS"
 else
     # Assume linux
+
+    # Build version.tmp and replace version.in with it (so that the version is
+    # correctly set).
+    # This is a little bit hack-ish, as it assumes that 'git' is not
+    # available in docker (otherwise it will describe as -dirty
+    # because this modifies the source file version.in).
+    make -f Makefile.in srcdir=. version.tmp
+    cp version.tmp src/version.in
 
     # Run build in docker
     IMAGE_TAG=`echo $IMAGE | sed -e 's/+/-/g'`

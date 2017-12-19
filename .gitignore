@@ -12,7 +12,7 @@ b~*.ad?
 testsuite/get_entities
 
 # Generated directories on Windows
-build/
+/build/
 
 # Generated directories on Linux
 lib/
