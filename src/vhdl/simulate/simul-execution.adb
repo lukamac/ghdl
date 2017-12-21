@@ -1605,6 +1605,8 @@ package body Simul.Execution is
             File_Operation.Untruncated_Text_Read
               (Args (0), Args (1), Args (2));
          when Std_Names.Name_Control_Simulation =>
+            --  FIXME: handle stop properly.
+            --  FIXME: this is the only place where longjump is called.
             Grt.Lib.Ghdl_Control_Simulation
               (Args (0).B1, Args (1).B1, Std_Integer (Args (2).I64));
             --  Do not return.
@@ -2522,27 +2524,37 @@ package body Simul.Execution is
       end if;
    end Execute_Expression_With_Type;
 
-   function Execute_Signal_Init_Value (Block : Block_Instance_Acc; Expr : Iir)
-                                      return Iir_Value_Literal_Acc
+   function Execute_Signal_Name
+     (Block : Block_Instance_Acc; Expr : Iir; Kind : Signal_Slot)
+     return Iir_Value_Literal_Acc
    is
       Base : constant Iir := Get_Object_Prefix (Expr, False);
       Info : constant Sim_Info_Acc := Get_Info (Base);
       Bblk : Block_Instance_Acc;
+      Slot : Object_Slot_Type;
       Base_Val : Iir_Value_Literal_Acc;
       Res : Iir_Value_Literal_Acc;
       Is_Sig : Boolean;
    begin
       if Get_Kind (Base) = Iir_Kind_Object_Alias_Declaration then
          Bblk := Get_Instance_By_Scope (Block, Info.Obj_Scope);
-         Base_Val := Execute_Signal_Init_Value (Bblk, Get_Name (Base));
+         Base_Val := Execute_Signal_Name (Bblk, Get_Name (Base), Kind);
       else
          Bblk := Get_Instance_By_Scope (Block, Info.Obj_Scope);
-         Base_Val := Bblk.Objects (Info.Slot + 1);
+         case Kind is
+            when Signal_Sig =>
+               Slot := Info.Slot;
+            when Signal_Val =>
+               Slot := Info.Slot + 1;
+            when Signal_Init =>
+               Slot := Info.Slot + 2;
+         end case;
+         Base_Val := Bblk.Objects (Slot);
       end if;
       Execute_Name_With_Base (Block, Expr, Base_Val, Res, Is_Sig);
       pragma Assert (Is_Sig);
       return Res;
-   end Execute_Signal_Init_Value;
+   end Execute_Signal_Name;
 
    --  Indexed element will be at Pfx.Val_Array.V (Pos + 1)
    procedure Execute_Indexed_Name (Block: Block_Instance_Acc;
@@ -2651,7 +2663,8 @@ package body Simul.Execution is
            | Iir_Kind_Attribute_Value
            | Iir_Kind_Iterator_Declaration
            | Iir_Kind_Terminal_Declaration
-           | Iir_Kinds_Quantity_Declaration =>
+           | Iir_Kinds_Quantity_Declaration
+           | Iir_Kind_Psl_Endpoint_Declaration =>
             if Base /= null then
                Res := Base;
             else
@@ -2726,7 +2739,6 @@ package body Simul.Execution is
 
          when Iir_Kind_Aggregate =>
             Res := Execute_Name_Aggregate (Block, Expr, Get_Type (Expr));
-            --  FIXME: is_sig ?
 
          when Iir_Kind_Image_Attribute =>
             Res := Execute_Image_Attribute (Block, Expr);
@@ -2946,7 +2958,8 @@ package body Simul.Execution is
            | Iir_Kind_Slice_Name
            | Iir_Kind_Selected_Element
            | Iir_Kind_Dereference
-           | Iir_Kind_Implicit_Dereference =>
+           | Iir_Kind_Implicit_Dereference
+           | Iir_Kind_Psl_Endpoint_Declaration =>
             return Execute_Name (Block, Expr);
 
          when Iir_Kinds_Denoting_Name
@@ -4070,9 +4083,9 @@ package body Simul.Execution is
 
    procedure Execute_Signal_Assignment
      (Instance: Block_Instance_Acc;
-      Stmt: Iir_Signal_Assignment_Statement)
+      Stmt: Iir_Signal_Assignment_Statement;
+      Wf : Iir)
    is
-      Wf : constant Iir_Waveform_Element := Get_Waveform_Chain (Stmt);
       Nbr_We : constant Natural := Get_Chain_Length (Wf);
 
       Transactions : Transaction_Type (Nbr_We);
@@ -4318,6 +4331,53 @@ package body Simul.Execution is
             Error_Kind ("is_in_choice", Choice);
       end case;
    end Is_In_Choice;
+
+   function Execute_Choice (Instance : Block_Instance_Acc;
+                            Expr : Iir;
+                            First_Assoc : Iir) return Iir
+   is
+      Value: Iir_Value_Literal_Acc;
+      Assoc: Iir;
+      Assoc_Res : Iir;
+      Marker : Mark_Type;
+   begin
+      Mark (Marker, Expr_Pool);
+      Assoc := First_Assoc;
+
+      Value := Execute_Expression (Instance, Expr);
+      if Get_Type_Staticness (Get_Type (Expr)) /= Locally
+        and then Get_Kind (Assoc) = Iir_Kind_Choice_By_Expression
+      then
+         --  Choice is not locally constrained, check length.
+         declare
+            Choice_Type : constant Iir :=
+              Get_Type (Get_Choice_Expression (Assoc));
+            Choice_Len : Iir_Int64;
+         begin
+            Choice_Len := Evaluation.Eval_Discrete_Type_Length
+              (Get_String_Type_Bound_Type (Choice_Type));
+            if Choice_Len /= Iir_Int64 (Value.Bounds.D (1).Length) then
+               Error_Msg_Constraint (Expr);
+            end if;
+         end;
+      end if;
+
+      while Assoc /= Null_Iir loop
+         if not Get_Same_Alternative_Flag (Assoc) then
+            Assoc_Res := Assoc;
+         end if;
+
+         if Is_In_Choice (Instance, Assoc, Value) then
+            Release (Marker, Expr_Pool);
+            return Assoc_Res;
+         end if;
+
+         Assoc := Get_Chain (Assoc);
+      end loop;
+      --  FIXME: infinite loop???
+      Error_Msg_Exec ("no choice for expression", Expr);
+      raise Internal_Error;
+   end Execute_Choice;
 
    --  Return TRUE iff VAL is in the range defined by BOUNDS.
    function Is_In_Range (Val : Iir_Value_Literal_Acc;
@@ -4591,52 +4651,17 @@ package body Simul.Execution is
    is
       Instance : constant Block_Instance_Acc := Proc.Instance;
       Stmt : constant Iir := Instance.Stmt;
-      Expr : constant Iir := Get_Expression (Stmt);
-      Value: Iir_Value_Literal_Acc;
       Assoc: Iir;
       Stmt_Chain : Iir;
-      Marker : Mark_Type;
    begin
-      Mark (Marker, Expr_Pool);
-
-      Value := Execute_Expression (Instance, Expr);
-      Assoc := Get_Case_Statement_Alternative_Chain (Stmt);
-      if Get_Type_Staticness (Get_Type (Expr)) /= Locally
-        and then Get_Kind (Assoc) = Iir_Kind_Choice_By_Expression
-      then
-         declare
-            Choice_Type : constant Iir :=
-              Get_Type (Get_Choice_Expression (Assoc));
-            Choice_Len : Iir_Int64;
-         begin
-            Choice_Len := Evaluation.Eval_Discrete_Type_Length
-              (Get_String_Type_Bound_Type (Choice_Type));
-            if Choice_Len /= Iir_Int64 (Value.Bounds.D (1).Length) then
-               Error_Msg_Constraint (Expr);
-            end if;
-         end;
+      Assoc := Execute_Choice (Instance, Get_Expression (Stmt),
+                               Get_Case_Statement_Alternative_Chain (Stmt));
+      Stmt_Chain := Get_Associated_Chain (Assoc);
+      if Stmt_Chain = Null_Iir then
+         Update_Next_Statement (Proc);
+      else
+         Instance.Stmt := Stmt_Chain;
       end if;
-
-      while Assoc /= Null_Iir loop
-         if not Get_Same_Alternative_Flag (Assoc) then
-            Stmt_Chain := Get_Associated_Chain (Assoc);
-         end if;
-
-         if Is_In_Choice (Instance, Assoc, Value) then
-            if Stmt_Chain = Null_Iir then
-               Update_Next_Statement (Proc);
-            else
-               Instance.Stmt := Stmt_Chain;
-            end if;
-            Release (Marker, Expr_Pool);
-            return;
-         end if;
-
-         Assoc := Get_Chain (Assoc);
-      end loop;
-      --  FIXME: infinite loop???
-      Error_Msg_Exec ("no choice for expression", Stmt);
-      raise Internal_Error;
    end Execute_Case_Statement;
 
    procedure Execute_Call_Statement (Proc : Process_State_Acc)
@@ -4883,9 +4908,20 @@ package body Simul.Execution is
                Execute_If_Statement (Proc, Stmt);
 
             when Iir_Kind_Simple_Signal_Assignment_Statement =>
-               Execute_Signal_Assignment (Instance, Stmt);
+               Execute_Signal_Assignment
+                 (Instance, Stmt, Get_Waveform_Chain (Stmt));
                Update_Next_Statement (Proc);
 
+            when Iir_Kind_Selected_Waveform_Assignment_Statement =>
+               declare
+                  Assoc : Iir;
+               begin
+                  Assoc := Execute_Choice (Instance, Get_Expression (Stmt),
+                                           Get_Selected_Waveform_Chain (Stmt));
+                  Execute_Signal_Assignment
+                    (Instance, Stmt, Get_Associated_Chain (Assoc));
+                  Update_Next_Statement (Proc);
+               end;
             when Iir_Kind_Assertion_Statement =>
                declare
                   Res : Boolean;

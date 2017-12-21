@@ -66,8 +66,8 @@ package body Simul.Annotations is
             Info := new Sim_Info_Type'(Kind => Kind_Signal,
                                        Obj_Scope => Block_Info,
                                        Slot => Block_Info.Nbr_Objects);
-            --  Reserve one more slot for value.
-            Block_Info.Nbr_Objects := Block_Info.Nbr_Objects + 1;
+            --  Reserve one more slot for value, and initial driver value.
+            Block_Info.Nbr_Objects := Block_Info.Nbr_Objects + 2;
          when Kind_Terminal =>
             Info := new Sim_Info_Type'(Kind => Kind_Terminal,
                                        Obj_Scope => Block_Info,
@@ -783,6 +783,7 @@ package body Simul.Annotations is
             when Iir_Kind_Return_Statement =>
                null;
             when Iir_Kind_Simple_Signal_Assignment_Statement
+              | Iir_Kind_Selected_Waveform_Assignment_Statement
               | Iir_Kind_Variable_Assignment_Statement =>
                null;
             when Iir_Kind_Procedure_Call_Statement =>
@@ -988,6 +989,8 @@ package body Simul.Annotations is
 
             when Iir_Kind_Psl_Cover_Statement
               | Iir_Kind_Psl_Assert_Statement =>
+               null;
+            when Iir_Kind_Psl_Endpoint_Declaration =>
                Create_Object_Info (Block_Info, El, Kind_PSL);
 
             when Iir_Kind_Simple_Simultaneous_Statement =>

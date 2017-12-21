@@ -27,6 +27,7 @@ with Std_Package;
 with Trans_Analyzes;
 with Simul.Elaboration; use Simul.Elaboration;
 with Simul.Execution; use Simul.Execution;
+with Simul.Annotations; use Simul.Annotations;
 with Ieee.Std_Logic_1164;
 with Grt.Main;
 with Simul.Debugger; use Simul.Debugger;
@@ -152,24 +153,29 @@ package body Simul.Simulation.Main is
    -- Add a driver for signal designed by VAL (via index field) for instance
    -- INSTANCE of process PROC.
    -- FIXME: default value.
-   procedure Add_Source
-     (Instance: Block_Instance_Acc; Val: Iir_Value_Literal_Acc; Proc: Iir)
-   is
+   procedure Add_Source (Instance : Block_Instance_Acc;
+                         Sig : Iir_Value_Literal_Acc;
+                         Val : Iir_Value_Literal_Acc) is
    begin
       case Val.Kind is
-         when Iir_Value_Signal =>
-            if Proc = Null_Iir then
-               -- Can this happen ?
-               raise Internal_Error;
-            end if;
-            Grt.Signals.Ghdl_Process_Add_Driver (Val.Sig);
+         when Iir_Value_B1 =>
+            Grt.Signals.Ghdl_Signal_Add_Port_Driver_B1 (Sig.Sig, Val.B1);
+         when Iir_Value_E8 =>
+            Grt.Signals.Ghdl_Signal_Add_Port_Driver_E8 (Sig.Sig, Val.E8);
+         when Iir_Value_E32 =>
+            Grt.Signals.Ghdl_Signal_Add_Port_Driver_E32 (Sig.Sig, Val.E32);
+         when Iir_Value_I64 =>
+            Grt.Signals.Ghdl_Signal_Add_Port_Driver_I64 (Sig.Sig, Val.I64);
+         when Iir_Value_F64 =>
+            Grt.Signals.Ghdl_Signal_Add_Port_Driver_F64 (Sig.Sig, Val.F64);
          when Iir_Value_Array =>
-            for I in Val.Val_Array.V'Range loop
-               Add_Source (Instance, Val.Val_Array.V (I), Proc);
+            for I in Sig.Val_Array.V'Range loop
+               Add_Source (Instance, Sig.Val_Array.V (I), Val.Val_Array.V (I));
             end loop;
          when Iir_Value_Record =>
-            for I in Val.Val_Record.V'Range loop
-               Add_Source (Instance, Val.Val_Record.V (I), Proc);
+            for I in Sig.Val_Record.V'Range loop
+               Add_Source
+                 (Instance, Sig.Val_Record.V (I), Val.Val_Record.V (I));
             end loop;
          when others =>
             raise Internal_Error;
@@ -183,7 +189,8 @@ package body Simul.Simulation.Main is
       Driver_List: Iir_List;
       It : List_Iterator;
       El: Iir;
-      Val: Iir_Value_Literal_Acc;
+      Val : Iir_Value_Literal_Acc;
+      Sig : Iir_Value_Literal_Acc;
       Marker : Mark_Type;
    begin
       if Trace_Drivers then
@@ -203,8 +210,11 @@ package body Simul.Simulation.Main is
          end if;
 
          Mark (Marker, Expr_Pool);
-         Val := Execute_Name (Instance, El, True);
-         Add_Source (Instance, Val, Proc);
+         --  The signal name is evaluated twice, but as it is globally static,
+         --  it shouldn't have any side-effect.  So not optimized but safe.
+         Sig := Execute_Signal_Name (Instance, El, Signal_Sig);
+         Val := Execute_Signal_Name (Instance, El, Signal_Init);
+         Add_Source (Instance, Sig, Val);
          Release (Marker, Expr_Pool);
 
          Next (It);
@@ -420,9 +430,13 @@ package body Simul.Simulation.Main is
       Release (Marker, Expr_Pool);
       if V then
          Nvec := (others => False);
-         if Get_Kind (E.Stmt) = Iir_Kind_Psl_Cover_Statement then
-            Nvec (0) := True;
-         end if;
+         case Get_Kind (E.Stmt) is
+            when Iir_Kind_Psl_Cover_Statement
+              | Iir_Kind_Psl_Endpoint_Declaration =>
+               Nvec (0) := True;
+            when others =>
+               null;
+         end case;
 
          --  For each state: if set, evaluate all outgoing edges.
          NFA := Get_PSL_NFA (E.Stmt);
@@ -457,21 +471,31 @@ package body Simul.Simulation.Main is
          S := Get_Final_State (NFA);
          S_Num := Get_State_Label (S);
          pragma Assert (S_Num = Get_PSL_Nbr_States (E.Stmt) - 1);
-         if Nvec (S_Num) then
-            case Get_Kind (E.Stmt) is
-               when Iir_Kind_Psl_Assert_Statement =>
+         case Get_Kind (E.Stmt) is
+            when Iir_Kind_Psl_Assert_Statement =>
+               if Nvec (S_Num) then
                   Execute_Failed_Assertion
                     (E.Instance, "psl assertion", E.Stmt,
                      "assertion violation", 2);
-               when Iir_Kind_Psl_Cover_Statement =>
-                  Execute_Failed_Assertion
-                    (E.Instance, "psl cover", E.Stmt,
-                     "sequence covered", 0);
+               end if;
+            when Iir_Kind_Psl_Cover_Statement =>
+               if Nvec (S_Num) then
+                  if Get_Report_Expression (E.Stmt) /= Null_Iir then
+                     Execute_Failed_Assertion
+                       (E.Instance, "psl cover", E.Stmt,
+                        "sequence covered", 0);
+                  end if;
                   E.Done := True;
-               when others =>
-                  Error_Kind ("PSL_Process_Executer", E.Stmt);
-            end case;
-         end if;
+               end if;
+            when Iir_Kind_Psl_Endpoint_Declaration =>
+               declare
+                  Info : constant Sim_Info_Acc := Get_Info (E.Stmt);
+               begin
+                  E.Instance.Objects (Info.Slot).B1 := Ghdl_B1 (Nvec (S_Num));
+               end;
+            when others =>
+               Error_Kind ("PSL_Process_Executer", E.Stmt);
+         end case;
 
          E.States.all := Nvec;
       end if;
@@ -795,8 +819,7 @@ package body Simul.Simulation.Main is
    end Create_Connects;
 
    procedure Set_Disconnection (Val : Iir_Value_Literal_Acc;
-                                Time : Iir_Value_Time)
-   is
+                                Time : Iir_Value_Time) is
    begin
       case Val.Kind is
          when Iir_Value_Signal =>
@@ -1125,8 +1148,14 @@ package body Simul.Simulation.Main is
       end if;
    end Ghdl_Elaborate;
 
-   procedure Simulation_Entity (Top_Conf : Iir_Design_Unit) is
+   procedure Simulation_Entity (Top_Conf : Iir_Design_Unit)
+   is
+      use Grt.Errors;
+      Stop : Boolean;
+      Status : Integer;
    begin
+      Break_Time := Std_Time'Last;
+
       Top_Config := Top_Conf;
 
       Grt.Errors.Error_Hook := Debug_Error'Access;
@@ -1135,7 +1164,33 @@ package body Simul.Simulation.Main is
          Debug (Reason_Start);
       end if;
 
-      Grt.Main.Run;
+      Grt.Main.Run_Elab (Stop);
+      if Stop then
+         return;
+      end if;
+
+      Status := Grt.Main.Run_Through_Longjump
+        (Grt.Processes.Simulation_Init'Access);
+
+      if Status = 0 then
+         loop
+            Status := Grt.Main.Run_Through_Longjump
+              (Grt.Processes.Simulation_Cycle'Access);
+            exit when Status < 0 or Status = Run_Stop or Status = Run_Finished;
+
+            if Grt.Processes.Next_Time >= Break_Time
+              and then Break_Time /= Std_Time'Last
+            then
+               Debug (Reason_Time);
+            end if;
+
+            exit when Grt.Processes.Has_Simulation_Timeout;
+         end loop;
+      end if;
+
+      Grt.Processes.Simulation_Finish;
+
+      Grt.Main.Run_Finish (Status);
    exception
       when Debugger_Quit =>
          null;
