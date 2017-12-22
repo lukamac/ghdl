@@ -85,14 +85,8 @@ package Types is
 
    --  Index type is the source file table.
    --  This table is defined in the files_map package.
-   type Source_File_Entry is new Nat32;
+   type Source_File_Entry is new Uns32;
    No_Source_File_Entry: constant Source_File_Entry := 0;
-
-   --  FIXME: additional source file entries to create:
-   --  *std.standard*: for those created in std.standard
-   --  *error*: for erroneous one
-   --  *command-line*: used for identifiers from command line
-   --    (eg: unit to elab)
 
    --  Index into a file buffer.
    type Source_Ptr is new Uns32;

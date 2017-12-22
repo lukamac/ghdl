@@ -56,33 +56,40 @@ package body Simul.Annotations is
       case Obj_Kind is
          when Kind_Object =>
             Info := new Sim_Info_Type'(Kind => Kind_Object,
+                                       Ref => Obj,
                                        Obj_Scope => Block_Info,
                                        Slot => Block_Info.Nbr_Objects);
          when Kind_File =>
             Info := new Sim_Info_Type'(Kind => Kind_File,
+                                       Ref => Obj,
                                        Obj_Scope => Block_Info,
                                        Slot => Block_Info.Nbr_Objects);
          when Kind_Signal =>
             Info := new Sim_Info_Type'(Kind => Kind_Signal,
+                                       Ref => Obj,
                                        Obj_Scope => Block_Info,
                                        Slot => Block_Info.Nbr_Objects);
             --  Reserve one more slot for value, and initial driver value.
             Block_Info.Nbr_Objects := Block_Info.Nbr_Objects + 2;
          when Kind_Terminal =>
             Info := new Sim_Info_Type'(Kind => Kind_Terminal,
+                                       Ref => Obj,
                                        Obj_Scope => Block_Info,
                                        Slot => Block_Info.Nbr_Objects);
          when Kind_Quantity =>
             Info := new Sim_Info_Type'(Kind => Kind_Quantity,
+                                       Ref => Obj,
                                        Obj_Scope => Block_Info,
                                        Slot => Block_Info.Nbr_Objects);
          when Kind_PSL =>
             Info := new Sim_Info_Type'(Kind => Kind_PSL,
+                                       Ref => Obj,
                                        Obj_Scope => Block_Info,
                                        Slot => Block_Info.Nbr_Objects);
          when Kind_Block
            | Kind_Process
            | Kind_Frame
+           | Kind_Protected
            | Kind_Package
            | Kind_Scalar_Type
            | Kind_File_Type
@@ -223,7 +230,11 @@ package body Simul.Annotations is
          Decl := Get_Chain (Decl);
       end loop;
 
-      Prot_Info := new Sim_Info_Type'(Kind => Kind_Frame,
+      --  Note: if this protected type declaration appears in a generic
+      --  package declaration that is shared, the instances will always get
+      --  Nbr_Objects as 0...
+      Prot_Info := new Sim_Info_Type'(Kind => Kind_Protected,
+                                      Ref => Prot,
                                       Nbr_Objects => 0);
       Set_Info (Prot, Prot_Info);
 
@@ -280,6 +291,7 @@ package body Simul.Annotations is
                   Mode := Iir_Value_E32;
                end if;
                Set_Info (Def, new Sim_Info_Type'(Kind => Kind_Scalar_Type,
+                                                 Ref => Def,
                                                  Scalar_Mode => Mode));
                Annotate_Range_Expression
                  (Block_Info, Get_Range_Constraint (Def));
@@ -314,16 +326,19 @@ package body Simul.Annotations is
          when Iir_Kind_Integer_Type_Definition =>
             Set_Info (Def,
                       new Sim_Info_Type'(Kind => Kind_Scalar_Type,
+                                         Ref => Def,
                                          Scalar_Mode => Iir_Value_I64));
 
          when Iir_Kind_Floating_Type_Definition =>
             Set_Info (Def,
                       new Sim_Info_Type'(Kind => Kind_Scalar_Type,
+                                         Ref => Def,
                                          Scalar_Mode => Iir_Value_F64));
 
          when Iir_Kind_Physical_Type_Definition =>
             Set_Info (Def,
                       new Sim_Info_Type'(Kind => Kind_Scalar_Type,
+                                         Ref => Def,
                                          Scalar_Mode => Iir_Value_I64));
 
          when Iir_Kind_Array_Type_Definition =>
@@ -387,6 +402,7 @@ package body Simul.Annotations is
                end if;
                Set_Info (Def,
                          new Sim_Info_Type'(Kind => Kind_File_Type,
+                                            Ref => Def,
                                             File_Signature => Res));
             end;
 
@@ -429,6 +445,7 @@ package body Simul.Annotations is
       Block_Info.Nbr_Objects := Block_Info.Nbr_Objects + 1;
       Package_Info := new Sim_Info_Type'
         (Kind => Kind_Package,
+         Ref => Inter,
          Nbr_Objects => 0,
          Pkg_Slot => Block_Info.Nbr_Objects,
          Pkg_Parent => Block_Info);
@@ -495,6 +512,7 @@ package body Simul.Annotations is
       Interfaces : constant Iir := Get_Interface_Declaration_Chain (Subprg);
    begin
       Subprg_Info := new Sim_Info_Type'(Kind => Kind_Frame,
+                                        Ref => Subprg,
                                         Nbr_Objects => 0);
       Set_Info (Subprg, Subprg_Info);
 
@@ -527,6 +545,7 @@ package body Simul.Annotations is
       Info : Sim_Info_Acc;
    begin
       Info := new Sim_Info_Type'(Kind => Kind_Block,
+                                 Ref => Comp,
                                  Inst_Slot => Invalid_Instance_Slot,
                                  Nbr_Objects => 0,
                                  Nbr_Instances => 1); --  For the instance.
@@ -545,6 +564,7 @@ package body Simul.Annotations is
    begin
       Package_Info := new Sim_Info_Type'
         (Kind => Kind_Package,
+         Ref => Decl,
          Nbr_Objects => 0,
          Pkg_Slot => Invalid_Object_Slot,
          Pkg_Parent => null);
@@ -850,6 +870,7 @@ package body Simul.Annotations is
       Guard : Iir;
    begin
       Info := new Sim_Info_Type'(Kind => Kind_Block,
+                                 Ref => Block,
                                  Inst_Slot => Block_Info.Nbr_Instances,
                                  Nbr_Objects => 0,
                                  Nbr_Instances => 0);
@@ -877,6 +898,7 @@ package body Simul.Annotations is
       Info : Sim_Info_Acc;
    begin
       Info := new Sim_Info_Type'(Kind => Kind_Block,
+                                 Ref => Bod,
                                  Inst_Slot => Block_Info.Nbr_Instances,
                                  Nbr_Objects => 0,
                                  Nbr_Instances => 0);
@@ -936,6 +958,7 @@ package body Simul.Annotations is
    begin
       --  Add a slot just to put the instance.
       Info := new Sim_Info_Type'(Kind => Kind_Block,
+                                 Ref => Stmt,
                                  Inst_Slot => Block_Info.Nbr_Instances,
                                  Nbr_Objects => 0,
                                  Nbr_Instances => 1);
@@ -949,6 +972,7 @@ package body Simul.Annotations is
       Info : Sim_Info_Acc;
    begin
       Info := new Sim_Info_Type'(Kind => Kind_Process,
+                                 Ref => Stmt,
                                  Nbr_Objects => 0);
       Set_Info (Stmt, Info);
 
@@ -1014,6 +1038,7 @@ package body Simul.Annotations is
    begin
       Entity_Info :=
         new Sim_Info_Type'(Kind => Kind_Block,
+                           Ref => Decl,
                            Inst_Slot => Invalid_Instance_Slot,
                            Nbr_Objects => 0,
                            Nbr_Instances => 0);
@@ -1093,6 +1118,7 @@ package body Simul.Annotations is
       Block_Info.Nbr_Objects := Block_Info.Nbr_Objects + 1;
       Config_Info := new Sim_Info_Type'
         (Kind => Kind_Package,
+         Ref => Decl,
          Nbr_Objects => 0,
          Pkg_Slot => Block_Info.Nbr_Objects,
          Pkg_Parent => Block_Info);
@@ -1141,6 +1167,7 @@ package body Simul.Annotations is
                   pragma Assert (Global_Info = null);
                   Global_Info :=
                     new Sim_Info_Type'(Kind => Kind_Block,
+                                       Ref => El,
                                        Nbr_Objects => 0,
                                        Inst_Slot => Invalid_Instance_Slot,
                                        Nbr_Instances => 0);
@@ -1184,6 +1211,7 @@ package body Simul.Annotations is
               ("-- nbr objects:" & Object_Slot_Type'Image (Info.Nbr_Objects));
 
          when Kind_Frame
+           | Kind_Protected
            | Kind_Process
            | Kind_Package =>
             Put_Line
@@ -1215,6 +1243,7 @@ package body Simul.Annotations is
       case Info.Kind is
          when Kind_Block
            | Kind_Frame
+           | Kind_Protected
            | Kind_Process
            | Kind_Package =>
             Put_Line ("nbr objects:"

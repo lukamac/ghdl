@@ -74,23 +74,29 @@ package body Simul.Execution is
            | Kind_Process =>
             declare
                Current : Block_Instance_Acc;
-               --  Last : Block_Instance_Acc;
             begin
                Current := Instance;
                while Current /= null loop
                   if Current.Block_Scope = Scope then
                      return Current;
                   end if;
-               --  Last := Current;
                   Current := Current.Up_Block;
                end loop;
-               --  if Scope.Frame_Scope.Depth = 0
-               --    and then (Last.Block_Scope.Frame_Scope.Kind
-               --                = Scope_Kind_Package)
-               --  then
-               --     --  For instantiated packages.
-               --     return Last;
-               --  end if;
+               raise Internal_Error;
+            end;
+         when Kind_Protected =>
+            declare
+               Current : Block_Instance_Acc;
+            begin
+               Current := Instance;
+               while Current /= null loop
+                  if Current.Block_Scope = Scope
+                    or Current.Uninst_Scope = Scope
+                  then
+                     return Current;
+                  end if;
+                  Current := Current.Up_Block;
+               end loop;
                raise Internal_Error;
             end;
          when Kind_Package =>
@@ -3319,14 +3325,33 @@ package body Simul.Execution is
    --  FIXME: maybe fix the issue directly in Sem_Inst ?
    function Get_Subprogram_Body_Origin (Spec : Iir) return Iir
    is
-      Orig : constant Iir := Sem_Inst.Get_Origin (Spec);
+      Res : constant Iir := Get_Subprogram_Body (Spec);
+      Orig : Iir;
    begin
-      if Orig /= Null_Iir then
-         return Get_Subprogram_Body_Origin (Orig);
+      if Res /= Null_Iir then
+         return Res;
       else
-         return Get_Subprogram_Body (Spec);
+         Orig := Sem_Inst.Get_Origin (Spec);
+         pragma Assert (Orig /= Null_Iir);
+         return Get_Subprogram_Body_Origin (Orig);
       end if;
    end Get_Subprogram_Body_Origin;
+
+   --  Like Get_Protected_Type_Body, but also works for instances, where
+   --  instantiated nodes have no bodies.
+   --  FIXME: maybe fix the issue directly in Sem_Inst ?
+   function Get_Protected_Type_Body_Origin (Spec : Iir) return Iir
+   is
+      Res : constant Iir := Get_Protected_Type_Body (Spec);
+      Orig : Iir;
+   begin
+      if Res /= Null_Iir then
+         return Res;
+      else
+         Orig := Sem_Inst.Get_Origin (Spec);
+         return Get_Protected_Type_Body_Origin (Orig);
+      end if;
+   end Get_Protected_Type_Body_Origin;
 
    --  Create a block instance for subprogram IMP.
    function Create_Subprogram_Instance (Instance : Block_Instance_Acc;
@@ -3334,43 +3359,37 @@ package body Simul.Execution is
                                         Imp : Iir)
                                        return Block_Instance_Acc
    is
-      Parent : constant Iir := Get_Parent (Imp);
+      Parent : Iir;
       Bod : Iir;
 
       Up_Block: Block_Instance_Acc;
       Up_Info : Sim_Info_Acc;
 
-      Origin : Iir;
       Label : Iir;
    begin
       case Get_Kind (Imp) is
          when Iir_Kinds_Subprogram_Declaration =>
             Bod := Get_Subprogram_Body_Origin (Imp);
-         when Iir_Kind_Protected_Type_Body =>
-            Bod := Imp;
+            Parent := Get_Parent (Imp);
+            Label := Get_Subprogram_Specification (Bod);
+         when Iir_Kind_Protected_Type_Declaration =>
+            --  The parent of the protected type body must have the same scope
+            --  as the parent of the protected type declaration.
+            Bod := Get_Protected_Type_Body_Origin (Imp);
+            Parent := Get_Parent (Get_Type_Declarator (Imp));
+            Label := Imp;
          when others =>
             Error_Kind ("create_subprogram_instance", Imp);
       end case;
 
       if Prot_Obj /= null then
+         --  This is a call to a method (from the outside to a subprogram of
+         --  a protected type). Put the protected object as upblock.
          Up_Block := Prot_Obj;
-         Label := Imp;
       else
+         --  This is a normal subprogram call.
          Up_Info := Get_Info_For_Scope (Parent);
          Up_Block := Get_Instance_By_Scope (Instance, Up_Info);
-
-         if Up_Block.Uninst_Scope /= null then
-            Origin := Sem_Inst.Get_Origin (Imp);
-            pragma Assert (Origin /= Null_Iir);
-            --  Call to a subprogram of an instantiated package.
-            --  For a generic package, only the spec is instantiated, the body
-            --  is shared by all the instances.
-
-            --  Execute code of the 'shared' body
-            Label := Origin;
-         else
-            Label := Imp;
-         end if;
       end if;
 
       --  Extract the info from the body, as it is complete (has slot for
@@ -3396,7 +3415,8 @@ package body Simul.Execution is
                                     Block_Scope => Get_Info (Label),
                                     Uninst_Scope => null,
                                     Up_Block => Up_Block,
-                                    Label => Label,
+                                    Label => Imp,
+                                    Bod => Bod,
                                     Stmt => Null_Iir,
                                     Parent => Instance,
                                     Children => null,
@@ -3412,28 +3432,39 @@ package body Simul.Execution is
       end;
    end Create_Subprogram_Instance;
 
-   -- Destroy a dynamic block_instance.
-   procedure Execute_Subprogram_Call_Final (Instance : Block_Instance_Acc)
+   function Get_Protected_Object_Instance
+     (Block : Block_Instance_Acc; Call : Iir) return Block_Instance_Acc
    is
-      Subprg_Body : constant Iir := Get_Subprogram_Body (Instance.Label);
+      Meth_Obj : constant Iir := Get_Method_Object (Call);
+      Obj : Iir_Value_Literal_Acc;
+   begin
+      if Meth_Obj = Null_Iir then
+         return null;
+      else
+         Obj := Execute_Name (Block, Meth_Obj, True);
+         return Protected_Table.Table (Obj.Prot);
+      end if;
+   end Get_Protected_Object_Instance;
+
+   -- Destroy a dynamic block_instance.
+   procedure Execute_Subprogram_Call_Final (Instance : Block_Instance_Acc) is
    begin
       Finalize_Declarative_Part
-        (Instance, Get_Declaration_Chain (Subprg_Body));
+        (Instance, Get_Declaration_Chain (Instance.Bod));
    end Execute_Subprogram_Call_Final;
 
    function Execute_Function_Body (Instance : Block_Instance_Acc)
                                   return Iir_Value_Literal_Acc
    is
-      Subprg_Body : constant Iir := Get_Subprogram_Body (Instance.Label);
       Res : Iir_Value_Literal_Acc;
    begin
       Current_Process.Instance := Instance;
 
       Elaborate_Declarative_Part
-        (Instance, Get_Declaration_Chain (Subprg_Body));
+        (Instance, Get_Declaration_Chain (Instance.Bod));
 
       -- execute statements
-      Instance.Stmt := Get_Sequential_Statement_Chain (Subprg_Body);
+      Instance.Stmt := Get_Sequential_Statement_Chain (Instance.Bod);
       Execute_Sequential_Statements (Current_Process);
       pragma Assert (Current_Process.Instance = Instance);
 
@@ -3455,7 +3486,10 @@ package body Simul.Execution is
    end Execute_Function_Body;
 
    function Execute_Assoc_Function_Conversion
-     (Block : Block_Instance_Acc; Func : Iir; Val : Iir_Value_Literal_Acc)
+     (Block : Block_Instance_Acc;
+      Func : Iir;
+      Prot_Block : Block_Instance_Acc;
+      Val : Iir_Value_Literal_Acc)
      return Iir_Value_Literal_Acc
    is
       Inter : Iir;
@@ -3466,7 +3500,7 @@ package body Simul.Execution is
       Mark (Marker, Instance_Pool.all);
 
       -- Create an instance for this function.
-      Instance := Create_Subprogram_Instance (Block, null, Func);
+      Instance := Create_Subprogram_Instance (Block, Prot_Block, Func);
 
       Inter := Get_Interface_Declaration_Chain (Func);
       Elaboration.Create_Object (Instance, Inter);
@@ -3484,12 +3518,14 @@ package body Simul.Execution is
      return Iir_Value_Literal_Acc
    is
       Ent : Iir;
+      Prot_Block : Block_Instance_Acc;
    begin
       case Get_Kind (Conv) is
          when Iir_Kind_Function_Call =>
             --  FIXME: shouldn't CONV always be a denoting_name ?
+            Prot_Block := Get_Protected_Object_Instance (Block, Conv);
             return Execute_Assoc_Function_Conversion
-              (Block, Get_Implementation (Conv), Val);
+              (Block, Get_Implementation (Conv), Prot_Block, Val);
          when Iir_Kind_Type_Conversion =>
             --  FIXME: shouldn't CONV always be a denoting_name ?
             return Execute_Type_Conversion (Block, Val, Get_Type (Conv), Conv);
@@ -3497,7 +3533,8 @@ package body Simul.Execution is
            | Iir_Kind_Function_Declaration =>
             Ent := Strip_Denoting_Name (Conv);
             if Get_Kind (Ent) = Iir_Kind_Function_Declaration then
-               return Execute_Assoc_Function_Conversion (Block, Ent, Val);
+               return Execute_Assoc_Function_Conversion
+                 (Block, Ent, null, Val);
             elsif Get_Kind (Ent) in Iir_Kinds_Type_Declaration then
                return Execute_Type_Conversion
                  (Block, Val, Get_Type (Ent), Ent);
@@ -3613,12 +3650,12 @@ package body Simul.Execution is
               | Iir_Kind_Interface_File_Declaration =>
                Val := Execute_Expression (Out_Block, Actual);
                Implicit_Array_Conversion
-                 (Subprg_Block, Val, Get_Type (Formal), Assoc);
-               Check_Constraints (Subprg_Block, Val, Get_Type (Formal), Assoc);
+                 (Out_Block, Val, Get_Type (Formal), Assoc);
+               Check_Constraints (Out_Block, Val, Get_Type (Formal), Assoc);
             when Iir_Kind_Interface_Signal_Declaration =>
                Val := Execute_Name (Out_Block, Actual, True);
                Implicit_Array_Conversion
-                 (Subprg_Block, Val, Get_Type (Formal), Assoc);
+                 (Out_Block, Val, Get_Type (Formal), Assoc);
             when Iir_Kind_Interface_Variable_Declaration =>
                Mode := Get_Mode (Inter);
                if Mode = Iir_In_Mode then
@@ -3674,7 +3711,7 @@ package body Simul.Execution is
                      Conv := Get_Actual_Conversion (Assoc);
                      if Conv /= Null_Iir then
                         Val := Execute_Assoc_Conversion
-                          (Subprg_Block, Conv, Val);
+                          (Out_Block, Conv, Val);
                      end if;
                   end if;
 
@@ -3682,7 +3719,7 @@ package body Simul.Execution is
                end if;
 
                Implicit_Array_Conversion
-                 (Subprg_Block, Val, Get_Type (Formal), Assoc);
+                 (Out_Block, Val, Get_Type (Formal), Assoc);
 
             when others =>
                Error_Kind ("execute_association(2)", Inter);
@@ -3782,20 +3819,6 @@ package body Simul.Execution is
          Assoc_Idx := Assoc_Idx + 1;
       end loop;
    end Execute_Back_Association;
-
-   function Get_Protected_Object_Instance
-     (Block : Block_Instance_Acc; Call : Iir) return Block_Instance_Acc
-   is
-      Meth_Obj : constant Iir := Get_Method_Object (Call);
-      Obj : Iir_Value_Literal_Acc;
-   begin
-      if Meth_Obj = Null_Iir then
-         return null;
-      else
-         Obj := Execute_Name (Block, Meth_Obj, True);
-         return Protected_Table.Table (Obj.Prot);
-      end if;
-   end Get_Protected_Object_Instance;
 
    function Execute_Foreign_Function_Call
      (Block: Block_Instance_Acc; Expr : Iir; Imp : Iir)
@@ -4674,7 +4697,6 @@ package body Simul.Execution is
       Prot_Block : Block_Instance_Acc;
       Assoc_Chain: Iir;
       Inter_Chain : Iir;
-      Subprg_Body : Iir;
    begin
       if Get_Implicit_Definition (Imp) in Iir_Predefined_Implicit then
          Execute_Implicit_Procedure (Instance, Call);
@@ -4693,11 +4715,10 @@ package body Simul.Execution is
            (Instance, Subprg_Instance, Inter_Chain, Assoc_Chain);
 
          Current_Process.Instance := Subprg_Instance;
-         Subprg_Body := Get_Subprogram_Body (Imp);
          Elaborate_Declarative_Part
-           (Subprg_Instance, Get_Declaration_Chain (Subprg_Body));
+           (Subprg_Instance, Get_Declaration_Chain (Subprg_Instance.Bod));
 
-         Init_Sequential_Statements (Proc, Subprg_Body);
+         Init_Sequential_Statements (Proc, Subprg_Instance.Bod);
       end if;
    end Execute_Call_Statement;
 
