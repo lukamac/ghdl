@@ -244,6 +244,9 @@ package body Trans is
       --  Common routine for instance and frame.
       procedure Start_Instance_Factory (Inst : Inst_Build_Acc) is
       begin
+         Inst.Prev := Inst_Build;
+         Inst.Prev_Id_Start := Identifier_Start;
+
          Identifier_Start := Identifier_Len + 1;
 
          if Inst.Scope.Scope_Type /= O_Tnode_Null then
@@ -260,20 +263,21 @@ package body Trans is
          Inst : Inst_Build_Acc;
       begin
          Inst := new Inst_Build_Type (Instance);
-         Inst.Prev := Inst_Build;
-         Inst.Prev_Id_Start := Identifier_Start;
          Inst.Scope := Scope;
 
          Start_Instance_Factory (Inst);
       end Push_Instance_Factory;
 
-      procedure Push_Frame_Factory (Scope : Var_Scope_Acc)
+      procedure Push_Frame_Factory (Scope : Var_Scope_Acc;
+                                    Persistant : Boolean)
       is
          Inst : Inst_Build_Acc;
       begin
-         Inst := new Inst_Build_Type (Frame);
-         Inst.Prev := Inst_Build;
-         Inst.Prev_Id_Start := Identifier_Start;
+         if Persistant then
+            Inst := new Inst_Build_Type (Persistant_Frame);
+         else
+            Inst := new Inst_Build_Type (Stack_Frame);
+         end if;
          Inst.Scope := Scope;
 
          Start_Instance_Factory (Inst);
@@ -324,7 +328,7 @@ package body Trans is
       procedure Pop_Frame_Factory (Scope : in Var_Scope_Acc) is
       begin
          --  Not matching.
-         pragma Assert (Inst_Build.Kind = Frame);
+         pragma Assert (Inst_Build.Kind in Stack_Frame .. Persistant_Frame);
 
          Finish_Instance_Factory (Scope);
       end Pop_Frame_Factory;
@@ -367,7 +371,8 @@ package body Trans is
          case Inst_Build.Kind is
             when Local
               | Instance
-              | Frame =>
+              | Stack_Frame
+              | Persistant_Frame =>
                return True;
             when Global =>
                return False;
@@ -528,7 +533,7 @@ package body Trans is
                --  Create a var.
                New_Var_Decl (Res, Name.Id, O_Storage_Local, Vtype);
                return Var_Type'(Kind => Var_Local, E => Res);
-            when Instance | Frame =>
+            when Instance | Stack_Frame | Persistant_Frame =>
                --  Create a field.
                New_Record_Field (Inst_Build.Elements, Field, Name.Id, Vtype);
                return Var_Type'(Kind => Var_Scope, I_Build_Kind => K,
@@ -628,7 +633,9 @@ package body Trans is
                return Alloc_System;
             when Var_Scope =>
                case Var.I_Build_Kind is
-                  when Frame =>
+                  when Stack_Frame =>
+                     return Alloc_Stack;
+                  when Persistant_Frame =>
                      return Alloc_Return;
                   when Instance =>
                      return Alloc_System;
@@ -1154,21 +1161,20 @@ package body Trans is
             else
                return Lv2M (L, Vtype, Mode);
             end if;
-         when Type_Mode_Array
-            | Type_Mode_Record
+         when Type_Mode_Complex_Array
+            | Type_Mode_Complex_Record
             | Type_Mode_Protected =>
-            if Is_Complex_Type (Vtype) then
-               if Stable then
-                  return Dp2M (D, Vtype, Mode);
-               else
-                  return Lp2M (L, Vtype, Mode);
-               end if;
+            if Stable then
+               return Dp2M (D, Vtype, Mode);
             else
-               if Stable then
-                  return Dv2M (D, Vtype, Mode);
-               else
-                  return Lv2M (L, Vtype, Mode);
-               end if;
+               return Lp2M (L, Vtype, Mode);
+            end if;
+         when Type_Mode_Static_Array
+            | Type_Mode_Static_Record =>
+            if Stable then
+               return Dv2M (D, Vtype, Mode);
+            else
+               return Lv2M (L, Vtype, Mode);
             end if;
          when Type_Mode_Unknown =>
             raise Internal_Error;
@@ -1426,6 +1432,25 @@ package body Trans is
       return Tinfo.C /= null;
    end Is_Complex_Type;
 
+   function Is_Static_Type (Tinfo : Type_Info_Acc) return Boolean is
+   begin
+      case Tinfo.Type_Mode is
+         when Type_Mode_Non_Composite =>
+            return True;
+         when Type_Mode_Static_Record
+           | Type_Mode_Static_Array =>
+            return True;
+         when Type_Mode_Complex_Record
+           | Type_Mode_Complex_Array
+           | Type_Mode_Unbounded_Record
+           | Type_Mode_Unbounded_Array
+           | Type_Mode_Protected =>
+            return False;
+         when Type_Mode_Unknown =>
+            return False;
+      end case;
+   end Is_Static_Type;
+
    function Is_Unbounded_Type (Tinfo : Type_Info_Acc) return Boolean is
    begin
       return Tinfo.Type_Mode in Type_Mode_Unbounded;
@@ -1502,6 +1527,18 @@ package body Trans is
                            K => Kind, T => T, E => E,
                            Vtype => T.Ortho_Type (Kind),
                            Ptype => T.Ortho_Ptr_Type (Kind)));
+   end E2M;
+
+   function E2M (E : O_Enode;
+                 T : Type_Info_Acc;
+                 Kind  : Object_Kind_Type;
+                 Vtype : O_Tnode;
+                 Ptype : O_Tnode)
+                return Mnode is
+   begin
+      return Mnode'(M1 => (State => Mstate_E,
+                           K => Kind, T => T, E => E,
+                           Vtype => Vtype, Ptype => Ptype));
    end E2M;
 
    function Lv2M (L : O_Lnode; T : Type_Info_Acc; Kind : Object_Kind_Type)
@@ -1795,14 +1832,13 @@ package body Trans is
            | Type_Mode_Unbounded_Record
            | Type_Mode_Bounds_Acc =>
             return Lv2M (L, Vtype, Mode);
-         when Type_Mode_Array
-           | Type_Mode_Record
+         when Type_Mode_Complex_Array
+           | Type_Mode_Complex_Record
            | Type_Mode_Protected =>
-            if Is_Complex_Type (Vtype) then
-               return Lp2M (L, Vtype, Mode);
-            else
-               return Lv2M (L, Vtype, Mode);
-            end if;
+            return Lp2M (L, Vtype, Mode);
+         when Type_Mode_Static_Array
+           | Type_Mode_Static_Record =>
+            return Lv2M (L, Vtype, Mode);
          when Type_Mode_Unknown =>
             raise Internal_Error;
       end case;
@@ -1819,14 +1855,13 @@ package body Trans is
            | Type_Mode_Unbounded_Record
            | Type_Mode_Bounds_Acc =>
             return Dv2M (D, Vtype, Mode);
-         when Type_Mode_Array
-           | Type_Mode_Record
+         when Type_Mode_Complex_Array
+           | Type_Mode_Complex_Record
            | Type_Mode_Protected =>
-            if Is_Complex_Type (Vtype) then
-               return Dp2M (D, Vtype, Mode);
-            else
-               return Dv2M (D, Vtype, Mode);
-            end if;
+            return Dp2M (D, Vtype, Mode);
+         when Type_Mode_Static_Array
+           | Type_Mode_Static_Record =>
+            return Dv2M (D, Vtype, Mode);
          when Type_Mode_Unknown =>
             raise Internal_Error;
       end case;

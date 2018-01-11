@@ -100,6 +100,11 @@ package Trans is
    Ghdl_Bool_Array_Type : O_Tnode;
    Ghdl_Bool_Array_Ptr  : O_Tnode;
 
+   --  Size record
+   Ghdl_Sizes_Type : O_Tnode;
+   Ghdl_Sizes_Val : O_Fnode;
+   Ghdl_Sizes_Sig : O_Fnode;
+
    --  Comparaison type.
    Ghdl_Compare_Type : O_Tnode;
    Ghdl_Compare_Lt   : O_Cnode;
@@ -260,7 +265,8 @@ package Trans is
       procedure Push_Instance_Factory (Scope : Var_Scope_Acc);
 
       --  Likewise but for a frame.
-      procedure Push_Frame_Factory (Scope : Var_Scope_Acc);
+      procedure Push_Frame_Factory (Scope : Var_Scope_Acc;
+                                    Persistant : Boolean);
 
       --  Manually add a field to the current instance being built.
       function Add_Instance_Factory_Field (Name : O_Ident; Ftype : O_Tnode)
@@ -477,7 +483,29 @@ package Trans is
       --  are translated into functions.  The first argument of these functions
       --  is a pointer to the instance.
 
-      type Inst_Build_Kind_Type is (Local, Global, Frame, Instance);
+      type Inst_Build_Kind_Type is
+        (
+         --  Variables are declared locally.
+         Local,
+
+         --  Variables are global.
+         Global,
+
+         --  A record frame is created, whose lifetime is the lifetime of the
+         --  subprogram.  Variables become fields of the record frame, and
+         --  dynamic memory is allocated from the stack.
+         Stack_Frame,
+
+         --  A record frame is created, whose lifetime is longer than the
+         --  lifetime of the subprogram (for subprogram with suspension).
+         --  Variables become fields, and dynamic memory is allocated from the
+         --  secondary stack.
+         Persistant_Frame,
+
+         --  An instance record is created, which is never free.  Dynamic
+         --  memory is allocated from the heap.
+         Instance);
+
       type Inst_Build_Type (Kind : Inst_Build_Kind_Type);
       type Inst_Build_Acc is access Inst_Build_Type;
       type Inst_Build_Type (Kind : Inst_Build_Kind_Type) is record
@@ -489,7 +517,7 @@ package Trans is
                Prev_Global_Storage : O_Storage;
             when Global =>
                null;
-            when Instance | Frame =>
+            when Instance | Stack_Frame | Persistant_Frame =>
                Scope               : Var_Scope_Acc;
                Elements            : O_Element_List;
          end case;
@@ -754,6 +782,11 @@ package Trans is
             Bounds_Type     : O_Tnode;
             Bounds_Ptr_Type : O_Tnode;
 
+            --  Only for unbounded arrays: element size and bounds in
+            --  the bounds record
+            El_Size : O_Fnode;
+            El_Bounds : O_Fnode;
+
             --  The ortho type is a fat pointer to the base and the bounds.
             --  These are the fields of the fat pointer.
             Base_Field   : O_Fnode_Array;
@@ -834,6 +867,8 @@ package Trans is
       Base_Ptr_Type => (O_Tnode_Null, O_Tnode_Null),
       Bounds_Type => O_Tnode_Null,
       Bounds_Ptr_Type => O_Tnode_Null,
+      El_Size => O_Fnode_Null,
+      El_Bounds => O_Fnode_Null,
       Base_Field => (O_Fnode_Null, O_Fnode_Null),
       Bounds_Field => (O_Fnode_Null, O_Fnode_Null));
 
@@ -850,6 +885,8 @@ package Trans is
       Base_Ptr_Type => (O_Tnode_Null, O_Tnode_Null),
       Bounds_Type => O_Tnode_Null,
       Bounds_Ptr_Type => O_Tnode_Null,
+      El_Size => O_Fnode_Null,
+      El_Bounds => O_Fnode_Null,
       Base_Field => (O_Fnode_Null, O_Fnode_Null),
       Bounds_Field => (O_Fnode_Null, O_Fnode_Null));
 
@@ -903,18 +940,27 @@ package Trans is
       --  Thin access.
       Type_Mode_Acc,
 
-      --  Access to an unbounded type.
+      --  Access to an unbounded type (this is a thin pointer to bounds
+      --  followed by values).
       Type_Mode_Bounds_Acc,
 
-      --  Record.
-      Type_Mode_Record,
+      --  Record whose size is known at compile-time.  Can be a boxed record
+      --  if the base type is unbounded.
+      Type_Mode_Static_Record,
+      --  Constrained record, but size is not known at compile time.  Can be
+      --  a boxed record if the base type is unbounded.
+      Type_Mode_Complex_Record,
       --  Record with unbounded component(s).
       Type_Mode_Unbounded_Record,
-      --  Unbounded array type (used for unconstrained array).
+
+      --  Unbounded array type (used for unconstrained arrays).
       Type_Mode_Unbounded_Array,
-      --  Constrained array type (length is known at compile-time).
-      Type_Mode_Array,
-      --  Protected type
+      --  Constrainted array type, with size known at compile-time.
+      Type_Mode_Static_Array,
+      --  Constrained array type (for constrained arrays), but size is
+      --  not known at compile time.
+      Type_Mode_Complex_Array,
+      --  Protected type (always handled as a complex type).
       Type_Mode_Protected);
 
    --  For backward source compatibility, to be removed (TODO).
@@ -928,26 +974,33 @@ package Trans is
 
    --  Composite types, with the vhdl meaning: record and arrays.
    subtype Type_Mode_Composite is Type_Mode_Type range
-     Type_Mode_Record .. Type_Mode_Protected;
+     Type_Mode_Static_Record .. Type_Mode_Protected;
 
    subtype Type_Mode_Non_Composite is Type_Mode_Type range
      Type_Mode_B1 .. Type_Mode_Bounds_Acc;
 
    --  Array types.
    subtype Type_Mode_Arrays is Type_Mode_Type range
-     Type_Mode_Unbounded_Array .. Type_Mode_Array;
+     Type_Mode_Unbounded_Array .. Type_Mode_Complex_Array;
+
+   subtype Type_Mode_Bounded_Arrays is Type_Mode_Type range
+     Type_Mode_Static_Array .. Type_Mode_Complex_Array;
 
    --  Record types.
    subtype Type_Mode_Records is Type_Mode_Type range
-     Type_Mode_Record .. Type_Mode_Unbounded_Record;
+     Type_Mode_Static_Record .. Type_Mode_Unbounded_Record;
+
+   subtype Type_Mode_Bounded_Records is Type_Mode_Type range
+     Type_Mode_Static_Record .. Type_Mode_Complex_Record;
 
    --  Thin types, ie types whose length is a scalar.
    subtype Type_Mode_Thin is Type_Mode_Type range
      Type_Mode_B1 .. Type_Mode_Bounds_Acc;
 
-   --  Fat types, ie types whose length is longer than a scalar.
-   subtype Type_Mode_Fat is Type_Mode_Type range
-     Type_Mode_Record .. Type_Mode_Protected;
+   --  Aggregate types, ie types whose length is longer than a scalar.
+   subtype Type_Mode_Aggregate is Type_Mode_Type range
+     Type_Mode_Static_Record .. Type_Mode_Protected;
+   subtype Type_Mode_Fat is Type_Mode_Aggregate;
 
    subtype Type_Mode_Unbounded is Type_Mode_Type range
      Type_Mode_Unbounded_Record .. Type_Mode_Unbounded_Array;
@@ -985,13 +1038,11 @@ package Trans is
 
    --  These parameters are passed by copy, ie the argument of the subprogram
    --  is the value of the object.
-   subtype Type_Mode_Pass_By_Copy is Type_Mode_Type range
-     Type_Mode_B1 .. Type_Mode_Bounds_Acc;
+   subtype Type_Mode_Pass_By_Copy is Type_Mode_Thin;
 
    --  The parameters are passed by address, ie the argument of the
    --  subprogram is an address to the object.
-   subtype Type_Mode_Pass_By_Address is Type_Mode_Type range
-     Type_Mode_Record .. Type_Mode_Protected;
+   subtype Type_Mode_Pass_By_Address is Type_Mode_Aggregate;
 
    --  Call conventions.
    subtype Type_Mode_Call_By_Value is Type_Mode_Non_Composite;
@@ -1213,7 +1264,8 @@ package Trans is
             Incomplete_Type  : Iir;
 
          when Kind_Index =>
-            --  Field declaration for array dimension.
+            --  For index_subtype_declaration, the field containing
+            --  the bounds of that index, in the array bounds record.
             Index_Field : O_Fnode;
 
          when Kind_Field =>
@@ -1651,8 +1703,12 @@ package Trans is
    function Is_Composite (Info : Type_Info_Acc) return Boolean;
    pragma Inline (Is_Composite);
 
+   --  Type needs to be built.
    function Is_Complex_Type (Tinfo : Type_Info_Acc) return Boolean;
    pragma Inline (Is_Complex_Type);
+
+   --  Type size is known at compile-time.
+   function Is_Static_Type (Tinfo : Type_Info_Acc) return Boolean;
 
    --  True iff TINFO is base + bounds.
    function Is_Unbounded_Type (Tinfo : Type_Info_Acc) return Boolean;
@@ -1782,6 +1838,12 @@ package Trans is
    --  Creation of Mnodes.
 
    function E2M (E : O_Enode; T : Type_Info_Acc; Kind : Object_Kind_Type)
+                return Mnode;
+   function E2M (E : O_Enode;
+                 T : Type_Info_Acc;
+                 Kind  : Object_Kind_Type;
+                 Vtype : O_Tnode;
+                 Ptype : O_Tnode)
                 return Mnode;
 
    --  From a Lnode, general form (can be used for ranges, bounds, base...)
