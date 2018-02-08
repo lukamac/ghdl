@@ -175,12 +175,6 @@ package body Elocations is
            | Iir_Kind_Waveform_Element
            | Iir_Kind_Conditional_Waveform
            | Iir_Kind_Conditional_Expression
-           | Iir_Kind_Association_Element_By_Expression
-           | Iir_Kind_Association_Element_By_Individual
-           | Iir_Kind_Association_Element_Open
-           | Iir_Kind_Association_Element_Package
-           | Iir_Kind_Association_Element_Type
-           | Iir_Kind_Association_Element_Subprogram
            | Iir_Kind_Choice_By_Range
            | Iir_Kind_Choice_By_Expression
            | Iir_Kind_Choice_By_Others
@@ -245,6 +239,7 @@ package body Elocations is
            | Iir_Kind_Negation_Operator
            | Iir_Kind_Absolute_Operator
            | Iir_Kind_Not_Operator
+           | Iir_Kind_Implicit_Condition_Operator
            | Iir_Kind_Condition_Operator
            | Iir_Kind_Reduction_And_Operator
            | Iir_Kind_Reduction_Or_Operator
@@ -321,11 +316,11 @@ package body Elocations is
            | Iir_Kind_Selected_Name
            | Iir_Kind_Operator_Symbol
            | Iir_Kind_Reference_Name
-           | Iir_Kind_Selected_By_All_Name
-           | Iir_Kind_Parenthesis_Name
            | Iir_Kind_External_Constant_Name
            | Iir_Kind_External_Signal_Name
            | Iir_Kind_External_Variable_Name
+           | Iir_Kind_Selected_By_All_Name
+           | Iir_Kind_Parenthesis_Name
            | Iir_Kind_Package_Pathname
            | Iir_Kind_Absolute_Pathname
            | Iir_Kind_Relative_Pathname
@@ -373,6 +368,12 @@ package body Elocations is
            | Iir_Kind_Attribute_Name =>
             return Format_None;
          when Iir_Kind_Library_Clause
+           | Iir_Kind_Association_Element_By_Expression
+           | Iir_Kind_Association_Element_By_Individual
+           | Iir_Kind_Association_Element_Open
+           | Iir_Kind_Association_Element_Package
+           | Iir_Kind_Association_Element_Type
+           | Iir_Kind_Association_Element_Subprogram
            | Iir_Kind_Attribute_Specification
            | Iir_Kind_Anonymous_Type_Declaration
            | Iir_Kind_Attribute_Declaration
@@ -624,5 +625,21 @@ package body Elocations is
                      "no field Port_Map_Location");
       Set_Field2 (N, Loc);
    end Set_Port_Map_Location;
+
+   function Get_Arrow_Location (N : Iir) return Location_Type is
+   begin
+      pragma Assert (N /= Null_Iir);
+      pragma Assert (Has_Arrow_Location (Get_Kind (N)),
+                     "no field Arrow_Location");
+      return Get_Field1 (N);
+   end Get_Arrow_Location;
+
+   procedure Set_Arrow_Location (N : Iir; Loc : Location_Type) is
+   begin
+      pragma Assert (N /= Null_Iir);
+      pragma Assert (Has_Arrow_Location (Get_Kind (N)),
+                     "no field Arrow_Location");
+      Set_Field1 (N, Loc);
+   end Set_Arrow_Location;
 
 end Elocations;

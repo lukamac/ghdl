@@ -91,6 +91,13 @@ package body Sem_Types is
            | Iir_Kind_Record_Subtype_Definition =>
             Set_Type_Has_Signal (Get_Base_Type (Atype));
             Mark_Resolution_Function (Atype);
+            declare
+               Tm : constant Iir := Get_Subtype_Type_Mark (Atype);
+            begin
+               if Tm /= Null_Iir then
+                  Set_Type_Has_Signal (Get_Type (Get_Named_Entity (Tm)));
+               end if;
+            end;
          when others =>
             null;
       end case;
@@ -1497,8 +1504,8 @@ package body Sem_Types is
    procedure Sem_Array_Constraint_Indexes (Def : Iir; Type_Mark : Iir)
    is
       El_Type : constant Iir := Get_Element_Subtype (Type_Mark);
+      Base_Type : constant Iir := Get_Base_Type (Type_Mark);
       Type_Index, Subtype_Index: Iir;
-      Base_Type : Iir;
       Index_Staticness : Iir_Staticness;
       Type_Nbr_Dim : Natural;
       Subtype_Nbr_Dim : Natural;
@@ -1507,7 +1514,6 @@ package body Sem_Types is
       Subtype_Index_List2 : Iir_Flist;
    begin
       -- Check each index constraint against array type.
-      Base_Type := Get_Base_Type (Type_Mark);
       Set_Base_Type (Def, Base_Type);
 
       Index_Staticness := Locally;
@@ -1527,10 +1533,12 @@ package body Sem_Types is
          if Get_Kind (Type_Mark) = Iir_Kind_Array_Subtype_Definition then
             Set_Index_Constraint_Flag
               (Def, Get_Index_Constraint_Flag (Type_Mark));
+            Set_Index_Subtype_List
+              (Def, Get_Index_Subtype_List (Type_Mark));
          else
             Set_Index_Constraint_Flag (Def, False);
+            Set_Index_Subtype_List (Def, Type_Index_List);
          end if;
-         Set_Index_Subtype_List (Def, Type_Index_List);
       else
          if Get_Kind (Type_Mark) = Iir_Kind_Array_Subtype_Definition
            and then Get_Index_Constraint_Flag (Type_Mark)
