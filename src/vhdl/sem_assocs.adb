@@ -1483,7 +1483,7 @@ package body Sem_Assocs is
          Inter : Iir;
       begin
          --  A function declaration.
-         if Get_Kind (Decl) /= Iir_Kind_Function_Declaration then
+         if not Is_Function_Declaration (Decl) then
             return False;
          end if;
          --  That returns a boolean.
