@@ -286,6 +286,11 @@ package Grt.Signals is
       --  Only reset by GHW file dumper.
       RO_Event : Boolean;
 
+      --  Set only on an implicit signal when the signal will stay active on
+      --  the next cycle.  For example, 'Quiet(0ns) or 'Stable(0ns) are
+      --  generally active for 2 cycles, as they are first False and then True.
+      Implicit_Active_Next : Boolean;
+
       --  Set if the signal has already been visited.  When outside of the
       --  algorithm that use it, it must be cleared.
       Seen : Boolean;
@@ -395,6 +400,8 @@ package Grt.Signals is
       Eff_Actual,
 
       --  Sig must be updated but does not belong to the same net.
+      --  Forward is needed because an implicit signal may be active or not
+      --  if one of its source is.
       Imp_Forward,
       Imp_Forward_Build,
 
@@ -704,7 +711,7 @@ package Grt.Signals is
    --
    --  Assignment using direct driver:
    --  * the driver value is set
-   --  * put the signal on the ghdl_signal_active_chain, if the signal will
+   --  * put the signal on the signal_active_chain, if the signal will
    --    be active and if not already on the chain.
    procedure Ghdl_Signal_Add_Direct_Driver (Sign : Ghdl_Signal_Ptr;
                                             Drv : Ghdl_Value_Ptr);
