@@ -33,6 +33,7 @@ architecture a of ent is
 begin
   process begin
     report "Hello world" severity note;
+    wait;
   end process;
 end;
 
@@ -41,7 +42,7 @@ ghdl -a ent.vhd
 ghdl --elab-run ent
 
 #>> run.sh
-docker run --rm -tv /$(pwd):/src -w //src ghdl/ghdl:buster-mcode sh -c ./sim.sh
+docker run --rm -tv /$(pwd):/src:z -w //src ghdl/ghdl:buster-mcode sh -c ./sim.sh
 
 #>> end
 ```
