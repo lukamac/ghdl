@@ -1763,7 +1763,7 @@ package body Sem_Assocs is
 
       Set_Named_Entity (Actual, Res);
       Xrefs.Xref_Name (Actual);
-      Set_Use_Flag (Res, True);
+      Mark_Subprogram_Used (Res);
    end Sem_Association_Subprogram;
 
    --  Associate ASSOC with interface INTERFACE
@@ -2309,8 +2309,7 @@ package body Sem_Assocs is
                  or else Get_Parent (Inter) /= Get_Parent (Interface_Chain)
                then
                   if Finish then
-                     Error_Msg_Sem
-                       (+Assoc, "formal %i is not an interface name", +Inter);
+                     Error_Msg_Sem (+Assoc, "formal is not an interface name");
                   end if;
                   Match := Not_Compatible;
                   exit;
@@ -2329,8 +2328,7 @@ package body Sem_Assocs is
                   if Finish then
                      Error_Msg_Sem
                        (+Assoc,
-                        "formal conversion allowed only for interface object",
-                        +Formal_Conv);
+                        "formal conversion allowed only for interface object");
                   end if;
                   Match := Not_Compatible;
                   exit;
