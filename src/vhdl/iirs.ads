@@ -516,6 +516,11 @@ package Iirs is
    -- Iir_Kind_Choice_By_Expression (Short)
    --  (Iir_Kinds_Choice)
    --
+   --  Used by:
+   --  Iir_Kind_Aggregate
+   --  Iir_Kind_Case_Statement
+   --  Iir_Kind_Case_Generate_Statement
+   --  Iir_Kind_Concurrent_Selected_Signal_Assignment
    --
    --  The location of the first alternative is set on:
    --  'when' for case statement, selected assignment and case generate,
@@ -527,9 +532,6 @@ package Iirs is
    --  For a list of choices, only the first one is associated, the following
    --  associations have the same_alternative_flag set.
    --   Get/Set_Chain (Field2)
-   --
-   --  These are elements of an choice chain, which is used for
-   --  case_statement, concurrent_selected_signal_assignment, aggregates.
    --
    --  Get/Set what is associated with the choice.  There are two different
    --  nodes, one for simple association and the other for chain association.
@@ -560,6 +562,8 @@ package Iirs is
    --   Get/Set_Choice_Range (Field5)
    --
    --   Get/Set_Same_Alternative_Flag (Flag1)
+   --
+   --   Get/Set_Element_Type_Flag (Flag2)
    --
    -- Only for Iir_Kind_Choice_By_Range:
    -- Only for Iir_Kind_Choice_By_Expression:
@@ -6158,6 +6162,12 @@ package Iirs is
    --  Field: Flag1
    function Get_Same_Alternative_Flag (Target : Iir) return Boolean;
    procedure Set_Same_Alternative_Flag (Target : Iir; Val : Boolean);
+
+   --  For one-dimensional aggregates: the value associated of the type of the
+   --  element (vs of the type of the aggregate).  Always true before vhdl-08.
+   --  Field: Flag2
+   function Get_Element_Type_Flag (Target : Iir) return Boolean;
+   procedure Set_Element_Type_Flag (Target : Iir; Val : Boolean);
 
    --  Field: Field3
    function Get_Architecture (Target : Iir_Entity_Aspect_Entity) return Iir;

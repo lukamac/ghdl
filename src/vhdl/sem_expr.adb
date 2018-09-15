@@ -3028,7 +3028,6 @@ package body Sem_Expr is
 
       --  True if one sub-aggregate is by named/by position.
       Has_Named : Boolean := False;
-      Has_Positional : Boolean := False;
 
       --  True if one sub-aggregate is dynamic.
       Has_Dynamic : Boolean := False;
@@ -3057,6 +3056,161 @@ package body Sem_Expr is
    end record;
 
    type Array_Aggr_Info_Arr is array (Natural range <>) of Array_Aggr_Info;
+
+   procedure Sem_Array_Aggregate_Elements
+     (Aggr : Iir;
+      A_Type : Iir;
+      Expr_Staticness : in out Iir_Staticness;
+      Info : in out Array_Aggr_Info)
+   is
+      Element_Type : constant Iir := Get_Element_Subtype (A_Type);
+      El : Iir;
+      El_Expr : Iir;
+      Expr : Iir;
+      El_Staticness : Iir_Staticness;
+      Assoc_Chain : Iir;
+      Res_Type : Iir;
+
+      --  True if the type of the expression is the type of the aggregate.
+      Is_Array : Boolean;
+
+      --  Null_Iir if the type of aggregagte elements myst be of the element
+      --  type.
+      Elements_Types : Iir;
+      Elements_Types_List : Iir_List;
+   begin
+      --  LRM93 7.3.2.2 Array aggregates
+      --  [...] the expression of each element association must be of the
+      --  element type.
+
+      --  LRM08 9.3.3.3 Array aggregates
+      --  For an aggregate of a one-dimensional array type, [each choice shall
+      --  specify values of the index type], and the expression of each element
+      --  association shall be of either the element type or the type of the
+      --  aggregate.
+      if Flags.Vhdl_Std >= Vhdl_08
+        and then Is_One_Dimensional_Array_Type (A_Type)
+      then
+         Elements_Types_List := Create_Iir_List;
+         Append_Element (Elements_Types_List, Element_Type);
+         Append_Element (Elements_Types_List, Get_Base_Type (A_Type));
+         Elements_Types := Create_Overload_List (Elements_Types_List);
+      else
+         Elements_Types := Null_Iir;
+      end if;
+
+      Assoc_Chain := Get_Association_Choices_Chain (Aggr);
+
+      El := Assoc_Chain;
+      while El /= Null_Iir loop
+         if not Get_Same_Alternative_Flag (El) then
+            El_Expr := Get_Associated_Expr (El);
+            Is_Array := False;
+
+            --  Directly analyze the expression with the type of the element
+            --  if it cannot be the type of the aggregate.
+            --  In VHDL-2008, also do it when the expression is an aggregate.
+            --  This is not in the LRM, but otherwise this would create a lot
+            --  of ambiguities when the element type is a composite type.  Eg:
+            --
+            --    type time_unit is record
+            --      val : time;
+            --      name : string (1 to 3);
+            --    end record;
+            --    type time_names_type is array (1 to 2) of time_unit;
+            --    constant time_names : time_names_type :=
+            --      ((fs, "fs "), (ps, "ps "));
+            --
+            --  The type of the first sub-aggregate could be either time_unit
+            --  or time_names_type.  Because it's determined by the context,
+            --  it is ambiguous.  But there is no point in using aggregates
+            --  to specify a range of choices.
+            --  FIXME: fix LRM ?
+            if Elements_Types = Null_Iir
+              or else Get_Kind (El_Expr) = Iir_Kind_Aggregate
+            then
+               Expr := Sem_Expression (El_Expr, Element_Type);
+            else
+               Expr := Sem_Expression_Wildcard (El_Expr, Null_Iir);
+               if Expr /= Null_Iir then
+                  Res_Type := Compatible_Types_Intersect
+                    (Get_Type (Expr), Elements_Types);
+                  if Res_Type = Null_Iir then
+                     Error_Msg_Sem
+                       (+Get_Associated_Expr (El),
+                        "type of element not compatible with the "
+                          & "expected type");
+                     Set_Type (El_Expr, Error_Type);
+                     Expr := Null_Iir;
+                  elsif Is_Overload_List (Res_Type) then
+                     Error_Msg_Sem
+                       (+Expr, "type of element is ambiguous");
+                     Free_Overload_List (Res_Type);
+                     Set_Type (El_Expr, Error_Type);
+                     Expr := Null_Iir;
+                  else
+                     pragma Assert (Is_Defined_Type (Res_Type));
+                     Is_Array :=
+                       Get_Base_Type (Res_Type) = Get_Base_Type (A_Type);
+                     Expr := Sem_Expression_Wildcard (Expr, Res_Type);
+                  end if;
+               end if;
+            end if;
+
+            Set_Element_Type_Flag (El, not Is_Array);
+
+            if Expr /= Null_Iir then
+               El_Staticness := Get_Expr_Staticness (Expr);
+               Expr := Eval_Expr_If_Static (Expr);
+               Set_Associated_Expr (El, Expr);
+
+               if not Is_Static_Construct (Expr) then
+                  Set_Aggregate_Expand_Flag (Aggr, False);
+               end if;
+
+               if not Is_Array
+                 and then not Eval_Is_In_Bound (Expr, Element_Type)
+               then
+                  Info.Has_Bound_Error := True;
+                  Warning_Msg_Sem (Warnid_Runtime_Error, +Expr,
+                                   "element is out of the bounds");
+               end if;
+
+               Expr_Staticness := Min (Expr_Staticness, El_Staticness);
+
+               Info.Nbr_Assocs := Info.Nbr_Assocs + 1;
+            else
+               Info.Error := True;
+            end if;
+         end if;
+
+         if Is_Array then
+            --  LRM08 9.3.3.3 Array aggregates
+            --  If the type of the expression of an element association
+            --  is the type of the aggregate, then either the element
+            --  association shall be positional or the choice shall be
+            --  a discrete range.
+
+            --  GHDL: must be checked for all associations, so do it outside
+            --  the above 'if' statement.
+            case Get_Kind (El) is
+               when Iir_Kind_Choice_By_None
+                 | Iir_Kind_Choice_By_Range =>
+                  null;
+               when others =>
+                  Error_Msg_Sem
+                    (+El, "positional association or "
+                       & "discrete range choice required");
+            end case;
+         end if;
+
+         El := Get_Chain (El);
+      end loop;
+
+      if Elements_Types /= Null_Iir then
+         Free_Overload_List (Elements_Types);
+      end if;
+   end Sem_Array_Aggregate_Elements;
 
    --  Analyze an array aggregate AGGR of *base type* A_TYPE.
    --  The type of the array is computed into A_SUBTYPE.
@@ -3090,6 +3244,69 @@ package body Sem_Expr is
 
       Info : Array_Aggr_Info renames Infos (Dim);
    begin
+      --  Analyze aggregate elements.
+      if Constrained then
+         Expr_Staticness := Get_Type_Staticness (Index_Type);
+         if Expr_Staticness /= Locally then
+            --  Cannot be statically built as the bounds are not known and
+            --  must be checked at run-time.
+            Set_Aggregate_Expand_Flag (Aggr, False);
+         end if;
+      else
+         Expr_Staticness := Locally;
+      end if;
+
+      if Dim = Get_Nbr_Elements (Index_List) then
+         --  A type has been found for AGGR, analyze AGGR as if it was
+         --  an aggregate with a subtype (and not a string).
+         if Get_Kind (Aggr) = Iir_Kind_Aggregate then
+            Sem_Array_Aggregate_Elements (Aggr, A_Type, Expr_Staticness, Info);
+         else
+            --  Nothing to do for a string.
+            null;
+         end if;
+      else
+         --  A sub-aggregate: recurse.
+         declare
+            Sub_Aggr : Iir;
+         begin
+            --  Here we know that AGGR is an aggregate because:
+            --  * either this is the first call (ie DIM = 1) and therefore
+            --    AGGR is an aggregate (an aggregate is being analyzed).
+            --  * or DIM > 1 and the use of strings is checked (just bellow).
+            Assoc_Chain := Get_Association_Choices_Chain (Aggr);
+            Choice := Assoc_Chain;
+            while Choice /= Null_Iir loop
+               if not Get_Same_Alternative_Flag (Choice) then
+                  Sub_Aggr := Get_Associated_Expr (Choice);
+                  case Get_Kind (Sub_Aggr) is
+                     when Iir_Kind_Aggregate =>
+                        Sem_Array_Aggregate_Type_1
+                          (Sub_Aggr, A_Type, Infos, Constrained, Dim + 1);
+                        if not Get_Aggregate_Expand_Flag (Sub_Aggr) then
+                           Set_Aggregate_Expand_Flag (Aggr, False);
+                        end if;
+                     when Iir_Kind_String_Literal8 =>
+                        if Dim + 1 = Get_Nbr_Elements (Index_List) then
+                           Sem_Array_Aggregate_Type_1
+                             (Sub_Aggr, A_Type, Infos, Constrained, Dim + 1);
+                        else
+                           Error_Msg_Sem
+                             (+Sub_Aggr, "string literal not allowed here");
+                           Infos (Dim + 1).Error := True;
+                        end if;
+                     when others =>
+                        Error_Msg_Sem (+Sub_Aggr, "sub-aggregate expected");
+                        Infos (Dim + 1).Error := True;
+                  end case;
+               end if;
+               Choice := Get_Chain (Choice);
+            end loop;
+         end;
+      end if;
+      Set_Expr_Staticness
+        (Aggr, Min (Expr_Staticness, Get_Expr_Staticness (Aggr)));
+
       --  Analyze choices.
       case Get_Kind (Aggr) is
          when Iir_Kind_Aggregate =>
@@ -3183,9 +3400,6 @@ package body Sem_Expr is
             Error_Kind ("sem_array_aggregate_type_1", Aggr);
       end case;
 
-      if Is_Positional = True then
-         Info.Has_Positional := True;
-      end if;
       if Is_Positional = False then
          Info.Has_Named := True;
       end if;
@@ -3351,103 +3565,7 @@ package body Sem_Expr is
          end if;
       end if;
 
-      --  Analyze aggregate elements.
-      if Constrained then
-         Expr_Staticness := Get_Type_Staticness (Index_Type);
-         if Expr_Staticness /= Locally then
-            --  Cannot be statically built as the bounds are not known and
-            --  must be checked at run-time.
-            Set_Aggregate_Expand_Flag (Aggr, False);
-         end if;
-      else
-         Expr_Staticness := Locally;
-      end if;
-
-      if Dim = Get_Nbr_Elements (Index_List) then
-         --  A type has been found for AGGR, analyze AGGR as if it was
-         --  an aggregate with a subtype (and not a string).
-
-         if Get_Kind (Aggr) /= Iir_Kind_Aggregate then
-            --  Nothing to do for a string.
-            return;
-         end if;
-
-         -- LRM93 7.3.2.2:
-         --   the expression of each element association must be of the
-         --   element type.
-         declare
-            Element_Type : constant Iir := Get_Element_Subtype (A_Type);
-            El : Iir;
-            Expr : Iir;
-            El_Staticness : Iir_Staticness;
-         begin
-            El := Assoc_Chain;
-            while El /= Null_Iir loop
-               if not Get_Same_Alternative_Flag (El) then
-                  Expr := Get_Associated_Expr (El);
-                  Expr := Sem_Expression (Expr, Element_Type);
-                  if Expr /= Null_Iir then
-                     El_Staticness := Get_Expr_Staticness (Expr);
-                     Expr := Eval_Expr_If_Static (Expr);
-                     Set_Associated_Expr (El, Expr);
-
-                     if not Is_Static_Construct (Expr) then
-                        Set_Aggregate_Expand_Flag (Aggr, False);
-                     end if;
-
-                     if not Eval_Is_In_Bound (Expr, Element_Type)
-                     then
-                        Info.Has_Bound_Error := True;
-                        Warning_Msg_Sem (Warnid_Runtime_Error, +Expr,
-                                         "element is out of the bounds");
-                     end if;
-
-                     Expr_Staticness := Min (Expr_Staticness, El_Staticness);
-
-                     Info.Nbr_Assocs := Info.Nbr_Assocs + 1;
-                  else
-                     Info.Error := True;
-                  end if;
-               end if;
-               El := Get_Chain (El);
-            end loop;
-         end;
-      else
-         --  A sub-aggregate: recurse.
-         declare
-            Sub_Aggr : Iir;
-         begin
-            Choice := Assoc_Chain;
-            while Choice /= Null_Iir loop
-               if not Get_Same_Alternative_Flag (Choice) then
-                  Sub_Aggr := Get_Associated_Expr (Choice);
-                  case Get_Kind (Sub_Aggr) is
-                     when Iir_Kind_Aggregate =>
-                        Sem_Array_Aggregate_Type_1
-                          (Sub_Aggr, A_Type, Infos, Constrained, Dim + 1);
-                        if not Get_Aggregate_Expand_Flag (Sub_Aggr) then
-                           Set_Aggregate_Expand_Flag (Aggr, False);
-                        end if;
-                     when Iir_Kind_String_Literal8 =>
-                        if Dim + 1 = Get_Nbr_Elements (Index_List) then
-                           Sem_Array_Aggregate_Type_1
-                             (Sub_Aggr, A_Type, Infos, Constrained, Dim + 1);
-                        else
-                           Error_Msg_Sem
-                             (+Sub_Aggr, "string literal not allowed here");
-                           Infos (Dim + 1).Error := True;
-                        end if;
-                     when others =>
-                        Error_Msg_Sem (+Sub_Aggr, "sub-aggregate expected");
-                        Infos (Dim + 1).Error := True;
-                  end case;
-               end if;
-               Choice := Get_Chain (Choice);
-            end loop;
-         end;
-      end if;
-      Expr_Staticness := Min (Get_Expr_Staticness (Aggr),
-                              Min (Expr_Staticness, Choice_Staticness));
+      Expr_Staticness := Min (Get_Expr_Staticness (Aggr), Choice_Staticness);
       Set_Expr_Staticness (Aggr, Expr_Staticness);
    end Sem_Array_Aggregate_Type_1;
 
