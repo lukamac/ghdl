@@ -103,12 +103,21 @@ package Errorout is
       --  Declaration of a shared variable with a non-protected type.
       Warnid_Shared,
 
+      --  A declaration hides a previous one.
+      Warnid_Hide,
+
       --  Emit a warning when a declaration is never used.
       --  FIXME: currently only subprograms are handled.
       Warnid_Unused,
 
+      --  Others choice is not needed, all values are already covered.
+      Warnid_Others,
+
       --  Violation of pure rules.
       Warnid_Pure,
+
+      --  Violation of staticness rules
+      Warnid_Static,
 
       --  Any error
       Msgid_Error,
@@ -118,7 +127,7 @@ package Errorout is
 
    --  All specific warning messages.
    subtype Msgid_Warnings is Msgid_Type
-     range Warnid_Library .. Warnid_Pure;
+     range Warnid_Library .. Warnid_Static;
 
    --  Get the image of a warning.  This correspond the the identifier of ID,
    --  in lower case, without the Msgid_Warn_ prefix and with '_' replaced
@@ -341,7 +350,7 @@ private
 
    Default_Warnings : constant Warnings_Setting :=
      (Warnid_Binding | Warnid_Library | Warnid_Shared
-        | Warnid_Pure | Warnid_Specs
+        | Warnid_Pure | Warnid_Specs | Warnid_Hide
         | Warnid_Port    => (Enabled => True, Error => False),
       others             => (Enabled => False, Error => False));
 end Errorout;

@@ -2322,9 +2322,9 @@ package body Sem_Expr is
       --  LRM 8.8
       --
       --  If the expression is the name of an object whose subtype is locally
-      --  static, wether a scalar type or an array type, then each value of the
-      --  subtype must be represented once and only once in the set of choices
-      --  of the case statement and no other value is allowed; [...]
+      --  static, whether a scalar type or an array type, then each value of
+      --  the subtype must be represented once and only once in the set of
+      --  choices of the case statement and no other value is allowed; [...]
 
       -- 1. Allocate Arr, fill it and sort
       Count_Choices (Info, Choice_Chain);
@@ -2427,13 +2427,13 @@ package body Sem_Expr is
       Disc_Heap_Sort (Info.Nbr_Choices);
    end Sort_Discrete_Choices;
 
-   procedure Sem_Check_Continuous_Choices
-     (Choice_Chain : Iir;
-      Sub_Type : Iir;
-      Is_Sub_Range : Boolean;
-      Loc : Location_Type;
-      Low : out Iir;
-      High : out Iir)
+   procedure Sem_Check_Continuous_Choices (Choice_Chain : in out Iir;
+                                           Choice_Type : Iir;
+                                           Low : out Iir;
+                                           High : out Iir;
+                                           Loc : Location_Type;
+                                           Is_Sub_Range : Boolean;
+                                           Reorder_Choices : Boolean)
    is
       --  Nodes that can appear.
       Info : Choice_Info_Type;
@@ -2441,7 +2441,7 @@ package body Sem_Expr is
       Type_Has_Bounds : Boolean;
    begin
       --  Set TYPE_HAS_BOUNDS
-      case Get_Kind (Sub_Type) is
+      case Get_Kind (Choice_Type) is
          when Iir_Kind_Enumeration_Type_Definition
            | Iir_Kind_Enumeration_Subtype_Definition
            | Iir_Kind_Integer_Subtype_Definition =>
@@ -2449,12 +2449,12 @@ package body Sem_Expr is
          when Iir_Kind_Integer_Type_Definition =>
             Type_Has_Bounds := False;
          when others =>
-            Error_Kind ("sem_check_continuous_choices(3)", Sub_Type);
+            Error_Kind ("sem_check_continuous_choices(3)", Choice_Type);
       end case;
 
       --  Check the choices are within the bounds.
       if Type_Has_Bounds
-        and then Get_Type_Staticness (Sub_Type) = Locally
+        and then Get_Type_Staticness (Choice_Type) = Locally
       then
          declare
             Choice : Iir;
@@ -2470,12 +2470,12 @@ package body Sem_Expr is
                   when Iir_Kind_Choice_By_Expression =>
                      Expr := Get_Choice_Expression (Choice);
                      if Get_Expr_Staticness (Expr) = Locally then
-                        Ok := Eval_Is_In_Bound (Expr, Sub_Type);
+                        Ok := Eval_Is_In_Bound (Expr, Choice_Type);
                      end if;
                   when Iir_Kind_Choice_By_Range =>
                      Expr := Get_Choice_Range (Choice);
                      if Get_Expr_Staticness (Expr) = Locally then
-                        Ok := Eval_Is_Range_In_Bound (Expr, Sub_Type, True);
+                        Ok := Eval_Is_Range_In_Bound (Expr, Choice_Type, True);
                      end if;
                   when Iir_Kind_Choice_By_Others =>
                      null;
@@ -2519,8 +2519,7 @@ package body Sem_Expr is
          --  of index type BT at location LOC.
          procedure Error_No_Choice (Bt : Iir;
                                     L, H : Iir_Int64;
-                                    Loc : Location_Type)
-         is
+                                    Loc : Location_Type) is
          begin
             if L = H then
                Error_Msg_Sem (+Loc, "no choice for " & Disp_Discrete (Bt, L));
@@ -2536,14 +2535,16 @@ package body Sem_Expr is
          Pos : Iir_Int64;
          Pos_Max : Iir_Int64;
          E_Pos : Iir_Int64;
+         Choice : Iir;
+         Need_Others : Boolean;
 
-         Bt : constant Iir := Get_Base_Type (Sub_Type);
+         Bt : constant Iir := Get_Base_Type (Choice_Type);
       begin
          if not Is_Sub_Range
-           and then Get_Type_Staticness (Sub_Type) = Locally
+           and then Get_Type_Staticness (Choice_Type) = Locally
            and then Type_Has_Bounds
          then
-            Get_Low_High_Limit (Get_Range_Constraint (Sub_Type), Lb, Hb);
+            Get_Low_High_Limit (Get_Range_Constraint (Choice_Type), Lb, Hb);
          else
             Lb := Low;
             Hb := High;
@@ -2561,48 +2562,169 @@ package body Sem_Expr is
             Free (Info.Arr);
             return;
          end if;
+         Need_Others := False;
          for I in Info.Arr'Range loop
-            E_Pos := Eval_Pos (Get_Assoc_Low (Info.Arr (I)));
+            Choice := Info.Arr (I);
+            E_Pos := Eval_Pos (Get_Assoc_Low (Choice));
             if E_Pos > Pos_Max then
                --  Choice out of bound, already handled.
-               Error_No_Choice
-                 (Bt, Pos, Pos_Max, Get_Location (Info.Arr (I)));
+               Error_No_Choice (Bt, Pos, Pos_Max, Get_Location (Choice));
                --  Avoid other errors.
                Pos := Pos_Max + 1;
                exit;
             end if;
-            if Pos < E_Pos and then Info.Others_Choice = Null_Iir then
-               Error_No_Choice
-                 (Bt, Pos, E_Pos - 1, Get_Location (Info.Arr (I)));
+            if Pos < E_Pos then
+               Need_Others := True;
+               if Info.Others_Choice = Null_Iir then
+                  Error_No_Choice (Bt, Pos, E_Pos - 1, Get_Location (Choice));
+               end if;
             elsif Pos > E_Pos then
+               Need_Others := True;
                if Pos = E_Pos + 1 then
                   Error_Msg_Sem
-                    (+Info.Arr (I),
+                    (+Choice,
                      "duplicate choice for " & Disp_Discrete (Bt, E_Pos));
                else
                   Error_Msg_Sem
-                    (+Info.Arr (I), "duplicate choices for "
+                    (+Choice, "duplicate choices for "
                        & Disp_Discrete (Bt, E_Pos)
                        & " to " & Disp_Discrete (Bt, Pos));
                end if;
             end if;
-            Pos := Eval_Pos (Get_Assoc_High (Info.Arr (I))) + 1;
+
+            if Get_Kind (Choice) = Iir_Kind_Choice_By_Range then
+               Pos := Eval_Pos (Get_Assoc_High (Choice)) + 1;
+            else
+               Pos := E_Pos + 1;
+            end if;
          end loop;
-         if Pos /= Pos_Max + 1 and then Info.Others_Choice = Null_Iir then
-            Error_No_Choice (Bt, Pos, Pos_Max, Loc);
+         if Pos /= Pos_Max + 1 then
+            Need_Others := True;
+            if Info.Others_Choice = Null_Iir then
+               Error_No_Choice (Bt, Pos, Pos_Max, Loc);
+            end if;
+         end if;
+
+         if not Need_Others and then Info.Others_Choice /= Null_Iir then
+            Warning_Msg_Sem (Warnid_Others, +Info.Others_Choice,
+                             "redundant 'others' choices");
          end if;
       end;
+
+      --  LRM93 7.3.2.2 Array aggregates
+      --  An others choice is locally static if the applicable index constraint
+      --  if locally static.
+      if Info.Nbr_Choices > 0
+        and then Info.Others_Choice /= Null_Iir
+        and then Get_Type_Staticness (Choice_Type) /= Locally
+      then
+         Warning_Msg_Sem
+           (Warnid_Static, +Info.Others_Choice,
+            "'others' choice allowed only if the index constraint is static");
+      end if;
+
+      if Reorder_Choices then
+         declare
+            Ngroups : Int32;
+         begin
+
+            --  First, set Associated_Expr and Associated_Chain for nodes with
+            --  the same alternative.
+            declare
+               Assoc_Expr : Iir;
+               Assoc_Chain : Iir;
+               Assoc : Iir;
+            begin
+               Assoc := Choice_Chain;
+               Assoc_Expr := Null_Iir;
+               Assoc_Chain := Null_Iir;
+               Ngroups := 0;
+               while Assoc /= Null_Iir loop
+                  if Get_Same_Alternative_Flag (Assoc) then
+                     Set_Is_Ref (Assoc, True);
+                     Set_Associated_Expr (Assoc, Assoc_Expr);
+                     Set_Associated_Chain (Assoc, Assoc_Chain);
+                     Set_Same_Alternative_Flag (Assoc, False);
+                  else
+                     Set_Is_Ref (Assoc, False);
+                     Assoc_Expr := Get_Associated_Expr (Assoc);
+                     Assoc_Chain := Get_Associated_Chain (Assoc);
+                     Ngroups := Ngroups + 1;
+                  end if;
+
+                  --  The choice position is now a group id.
+                  Set_Choice_Position (Assoc, Ngroups);
+                  Assoc := Get_Chain (Assoc);
+               end loop;
+            end;
+
+            --  Then set Is_Ref on the first alternative.
+            declare
+               type Group_Array is array (1 .. Ngroups) of Boolean;
+               type Group_Acc is access Group_Array;
+               procedure Free is new Ada.Unchecked_Deallocation
+                 (Group_Array, Group_Acc);
+               Groups : Group_Acc;
+               Gid : Int32;
+               Pos : Int32;
+               Assoc : Iir;
+            begin
+               Groups := new Group_Array'(others => False);
+               for I in Info.Arr'Range loop
+                  Gid := Get_Choice_Position (Info.Arr (I));
+                  if Groups (Gid) then
+                     --  Already handled.
+                     Set_Is_Ref (Info.Arr (I), True);
+                  else
+                     Groups (Gid) := True;
+                     Set_Is_Ref (Info.Arr (I), False);
+                  end if;
+               end loop;
+
+               Free (Groups);
+
+               --  Restore Choice_Position.
+               Assoc := Choice_Chain;
+               Pos := 0;
+               while Assoc /= Null_Iir loop
+                  Set_Choice_Position (Assoc, Pos);
+                  Pos := Pos + 1;
+                  Assoc := Get_Chain (Assoc);
+               end loop;
+            end;
+
+            --  Then reorder.
+            declare
+               Assoc : Iir;
+               Assoc1 : Iir;
+            begin
+               Choice_Chain := Info.Arr (Info.Arr'First);
+               Assoc := Choice_Chain;
+               for I in Info.Arr'First + 1 .. Info.Arr'Last loop
+                  Assoc1 := Info.Arr (I);
+                  Set_Chain (Assoc, Assoc1);
+                  Assoc := Assoc1;
+               end loop;
+               Assoc1 := Info.Others_Choice;
+               if Assoc1 /= Null_Iir then
+                  Set_Chain (Assoc, Assoc1);
+                  Assoc := Assoc1;
+               end if;
+               Set_Chain (Assoc, Null_Iir);
+            end;
+         end;
+      end if;
 
       Free (Info.Arr);
    end Sem_Check_Continuous_Choices;
 
    procedure Sem_Choices_Range (Choice_Chain : in out Iir;
-                                Sub_Type : Iir;
-                                Is_Sub_Range : Boolean;
-                                Is_Case_Stmt : Boolean;
-                                Loc : Location_Type;
+                                Choice_Type : Iir;
                                 Low : out Iir;
-                                High : out Iir)
+                                High : out Iir;
+                                Loc : Location_Type;
+                                Is_Sub_Range : Boolean;
+                                Is_Case_Stmt : Boolean)
    is
       --  Number of positionnal choice.
       Nbr_Pos : Iir_Int64;
@@ -2631,8 +2753,9 @@ package body Sem_Expr is
          N_Choice : Iir;
          Name1 : Iir;
       begin
-         if Are_Types_Compatible (Range_Type, Sub_Type) = Not_Compatible then
-            Error_Not_Match (Name, Sub_Type);
+         if Are_Types_Compatible (Range_Type, Choice_Type) = Not_Compatible
+         then
+            Error_Not_Match (Name, Choice_Type);
             return False;
          end if;
 
@@ -2666,7 +2789,7 @@ package body Sem_Expr is
       begin
          if Get_Kind (El) = Iir_Kind_Choice_By_Range then
             Expr := Get_Choice_Range (El);
-            Expr := Sem_Discrete_Range_Expression (Expr, Sub_Type, True);
+            Expr := Sem_Discrete_Range_Expression (Expr, Choice_Type, True);
             if Expr = Null_Iir then
                return False;
             end if;
@@ -2701,10 +2824,11 @@ package body Sem_Expr is
                         return Replace_By_Range_Choice (Expr, Ent);
                      when others =>
                         Expr := Name_To_Expression
-                          (Expr, Get_Base_Type (Sub_Type));
+                          (Expr, Get_Base_Type (Choice_Type));
                   end case;
                when others =>
-                  Expr := Sem_Expression_Ov (Expr, Get_Base_Type (Sub_Type));
+                  Expr :=
+                    Sem_Expression_Ov (Expr, Get_Base_Type (Choice_Type));
             end case;
             if Expr = Null_Iir then
                return False;
@@ -2787,10 +2911,10 @@ package body Sem_Expr is
       --  For a positional aggregate.
       if Nbr_Pos > 0 then
          --  Check number of elements match, but only if it is possible.
-         if Get_Type_Staticness (Sub_Type) /= Locally then
+         if Get_Type_Staticness (Choice_Type) /= Locally then
             return;
          end if;
-         Pos_Max := Eval_Discrete_Type_Length (Sub_Type);
+         Pos_Max := Eval_Discrete_Type_Length (Choice_Type);
          if (not Has_Others and not Is_Sub_Range)
            and then Nbr_Pos < Pos_Max
          then
@@ -2825,8 +2949,8 @@ package body Sem_Expr is
          return;
       end if;
 
-      Sem_Check_Continuous_Choices
-        (Choice_Chain, Sub_Type, Is_Sub_Range, Loc, Low, High);
+      Sem_Check_Continuous_Choices (Choice_Chain, Choice_Type, Low, High, Loc,
+                                    Is_Sub_Range, not Is_Case_Stmt);
    end Sem_Choices_Range;
 
    -- Perform semantisation on a (sub)aggregate AGGR, which is of type
@@ -2895,6 +3019,7 @@ package body Sem_Expr is
          Set_Named_Entity (Expr, Aggr_El);
          Xref_Ref (Expr, Aggr_El);
 
+         --  Was a choice_by_expression, now by_name.
          N_El := Create_Iir (Iir_Kind_Choice_By_Name);
          Location_Copy (N_El, Ass);
          Set_Choice_Name (N_El, Expr);
@@ -2902,6 +3027,7 @@ package body Sem_Expr is
          Set_Associated_Chain (N_El, Get_Associated_Chain (Ass));
          Set_Chain (N_El, Get_Chain (Ass));
          Set_Same_Alternative_Flag (N_El, Get_Same_Alternative_Flag (Ass));
+         Set_Choice_Position (N_El, Get_Choice_Position (Ass));
 
          Free_Iir (Ass);
          Add_Match (N_El, Aggr_El);
@@ -2933,7 +3059,8 @@ package body Sem_Expr is
 
          --  If there is an associated expression with the choice, then the
          --  choice is a new alternative, and has no expected type.
-         if Expr /= Null_Iir then
+         if not Get_Same_Alternative_Flag (El) then
+            pragma Assert (Expr /= Null_Iir);
             El_Type := Null_Iir;
          end if;
 
@@ -2985,7 +3112,7 @@ package body Sem_Expr is
          end case;
 
          --  Analyze the expression associated.
-         if Expr /= Null_Iir then
+         if not Get_Same_Alternative_Flag (El) then
             if El_Type /= Null_Iir then
                Expr := Sem_Expression (Expr, El_Type);
                if Expr /= Null_Iir then
@@ -2997,10 +3124,15 @@ package body Sem_Expr is
                end if;
             else
                --  This case is not possible unless there is an error.
-               if Ok then
-                  raise Internal_Error;
-               end if;
+               pragma Assert (not Ok);
+               null;
             end if;
+         else
+            --  Always set associated expression.
+            pragma Assert (Expr = Null_Iir);
+            pragma Assert (Prev_El /= Null_Iir);
+            Set_Associated_Expr (El, Get_Associated_Expr (Prev_El));
+            Set_Is_Ref (El, True);
          end if;
 
          Prev_El := El;
@@ -3315,8 +3447,8 @@ package body Sem_Expr is
       case Get_Kind (Aggr) is
          when Iir_Kind_Aggregate =>
             Assoc_Chain := Get_Association_Choices_Chain (Aggr);
-            Sem_Choices_Range (Assoc_Chain, Index_Type, not Constrained, False,
-                               Get_Location (Aggr), Low, High);
+            Sem_Choices_Range (Assoc_Chain, Index_Type, Low, High,
+                               Get_Location (Aggr), not Constrained, False);
             Set_Association_Choices_Chain (Aggr, Assoc_Chain);
 
             --  Update infos.

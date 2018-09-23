@@ -1215,7 +1215,7 @@ package body Trans.Chap7 is
          procedure Walk_Concat (Imp : Iir; L, R : Iir);
 
          --  Call handlers for each leaf of E (an array expression).  First
-         --  check wether E is also a concatenation.
+         --  check whether E is also a concatenation.
          procedure Walk_Arr (E : Iir)
          is
             Imp : Iir;
@@ -2858,7 +2858,6 @@ package body Trans.Chap7 is
                                 Ghdl_Bool_Type));
       El_Node := Chap3.Index_Base (Base_Ptr, Target_Type,
                                    New_Obj_Value (It));
-      --New_Assign_Stmt (El_Node, Chap7.Translate_Expression (El));
       Translate_Assign (El_Node, El, Get_Element_Subtype (Target_Type));
       Inc_Var (It);
       Finish_Loop_Stmt (Label);
@@ -2930,13 +2929,34 @@ package body Trans.Chap7 is
       Expr_Type  : Iir;
       Final      : Boolean;
 
-      procedure Do_Assign (Expr : Iir) is
+      --  Assign EXPR to current position (defined by index VAR_INDEX), and
+      --  update VAR_INDEX.  Handles sub-aggregates.
+      procedure Do_Assign (Assoc : Iir)
+      is
+         Expr : constant Iir := Get_Associated_Expr (Assoc);
+         Dest : Mnode;
+         Len : Iir_Int64;
       begin
          if Final then
-            Translate_Assign (Chap3.Index_Base (Base_Ptr, Aggr_Type,
-                                                New_Obj_Value (Var_Index)),
-                              Expr, Expr_Type);
-            Inc_Var (Var_Index);
+            if Get_Element_Type_Flag (Assoc) then
+               Dest := Chap3.Index_Base (Base_Ptr, Aggr_Type,
+                                         New_Obj_Value (Var_Index));
+               Translate_Assign (Dest, Expr, Expr_Type);
+               Inc_Var (Var_Index);
+            else
+               Dest := Chap3.Slice_Base (Base_Ptr, Aggr_Type,
+                                         New_Obj_Value (Var_Index));
+               Translate_Assign (Dest, Expr, Get_Type (Expr));
+               --  FIXME: handle non-static expression type (at least for
+               --  choice by range).
+               Len := Eval_Discrete_Type_Length
+                 (Get_Index_Type (Get_Type (Expr), 0));
+               New_Assign_Stmt
+                 (New_Obj (Var_Index),
+                  New_Dyadic_Op (ON_Add_Ov,
+                                 New_Obj_Value (Var_Index),
+                                 New_Lit (New_Index_Lit (Unsigned_64 (Len)))));
+            end if;
          else
             Translate_Array_Aggregate_Gen
               (Base_Ptr, Bounds_Ptr, Expr, Aggr_Type, Dim + 1, Var_Index);
@@ -2959,7 +2979,7 @@ package body Trans.Chap7 is
                return;
             end if;
             exit when Get_Kind (El) /= Iir_Kind_Choice_By_None;
-            Do_Assign (Get_Associated_Expr (El));
+            Do_Assign (El);
             P := P + 1;
             El := Get_Chain (El);
          end loop;
@@ -2996,7 +3016,7 @@ package body Trans.Chap7 is
                                New_Lit (Ghdl_Index_0),
                                Ghdl_Bool_Type));
 
-            Do_Assign (Get_Associated_Expr (El));
+            Do_Assign (El);
             Dec_Var (Var_Len);
             Finish_Loop_Stmt (Label);
             Close_Temp;
@@ -3014,10 +3034,10 @@ package body Trans.Chap7 is
             --  There is only one choice
             case Get_Kind (El) is
                when Iir_Kind_Choice_By_Others =>
-                  --  falltrough...
-                  null;
+                  --  Handled by positional.
+                  raise Internal_Error;
                when Iir_Kind_Choice_By_Expression =>
-                  Do_Assign (Get_Associated_Expr (El));
+                  Do_Assign (El);
                   return;
                when Iir_Kind_Choice_By_Range =>
                   declare
@@ -3037,7 +3057,7 @@ package body Trans.Chap7 is
                                                     New_Obj_Value (Var_I),
                                                     New_Obj_Value (Var_Length),
                                                     Ghdl_Bool_Type));
-                     Do_Assign (Get_Associated_Expr (El));
+                     Do_Assign (El);
                      Inc_Var (Var_I);
                      Finish_Loop_Stmt (Label);
                      Close_Temp;
@@ -3058,7 +3078,6 @@ package body Trans.Chap7 is
             If_Blk     : O_If_Block;
             Case_Blk   : O_Case_Block;
             Label      : O_Snode;
-            El_Assoc   : Iir;
             Len_Tmp    : O_Enode;
          begin
             Open_Temp;
@@ -3088,15 +3107,11 @@ package body Trans.Chap7 is
 
             --  convert aggr into a case statement.
             Start_Case_Stmt (Case_Blk, New_Obj_Value (Var_Pos));
-            El_Assoc := Null_Iir;
             while El /= Null_Iir loop
                Start_Choice (Case_Blk);
                Chap8.Translate_Case_Choice (El, Range_Type, Case_Blk);
-               if Get_Associated_Expr (El) /= Null_Iir then
-                  El_Assoc := Get_Associated_Expr (El);
-               end if;
                Finish_Choice (Case_Blk);
-               Do_Assign (El_Assoc);
+               Do_Assign (El);
                El := Get_Chain (El);
             end loop;
             Finish_Case_Stmt (Case_Blk);

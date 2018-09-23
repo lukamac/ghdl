@@ -876,7 +876,7 @@ package body Sem_Assocs is
    begin
       Chain := Get_Individual_Association_Chain (Assoc);
       Sem_Check_Continuous_Choices
-        (Chain, Index_Type, False, Get_Location (Assoc), Low, High);
+        (Chain, Index_Type, Low, High, Get_Location (Assoc), False, False);
       Set_Individual_Association_Chain (Assoc, Chain);
       if Dim < Nbr_Dims then
          El := Chain;
@@ -909,7 +909,7 @@ package body Sem_Assocs is
       end if;
       Chain := Get_Individual_Association_Chain (Assoc);
       Sem_Choices_Range
-        (Chain, Base_Index, True, False, Get_Location (Assoc), Low, High);
+        (Chain, Base_Index, Low, High, Get_Location (Assoc), True, False);
       Set_Individual_Association_Chain (Assoc, Chain);
       if Actual_Index = Null_Iir then
          declare
@@ -2062,6 +2062,9 @@ package body Sem_Assocs is
       Assoc : Iir;
       Inter : Iir;
 
+      --  True if -Whide is enabled (save the state).
+      Warn_Hide_Enabled : Boolean;
+
       type Param_Assoc_Type is (None, Open, Individual, Whole);
 
       type Assoc_Array is array (Natural range <>) of Param_Assoc_Type;
@@ -2150,7 +2153,14 @@ package body Sem_Assocs is
          --  declaration and that would otherwise be directly visible is
          --  hidden.
          Sem_Scopes.Open_Declarative_Region;
+
+         --  Do not warn about hidding here, way to common, way useless.
+         Warn_Hide_Enabled := Is_Warning_Enabled (Warnid_Hide);
+         Enable_Warning (Warnid_Hide, False);
+
          Sem_Scopes.Add_Declarations_From_Interface_Chain (Interface_Chain);
+
+         Enable_Warning (Warnid_Hide, Warn_Hide_Enabled);
 
          First_Named_Assoc := Assoc;
          loop

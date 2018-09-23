@@ -404,6 +404,28 @@ package body Sem_Scopes is
       return Inter >= Current_Region_Start;
    end Is_In_Current_Declarative_Region;
 
+   --  Emit a warning when DECL hides PREV_DECL.
+   procedure Warning_Hide (Decl : Iir; Prev_Decl : Iir)
+   is
+   begin
+      if Get_Kind (Decl) in Iir_Kinds_Interface_Declaration
+        and then Get_Kind (Get_Parent (Decl)) = Iir_Kind_Component_Declaration
+      then
+         --  Do not warn when an interface in a component hides a declaration.
+         --  This is a common case (eg: in testbenches), and there is no real
+         --  hiding.
+         return;
+      end if;
+
+      if Decl = Prev_Decl then
+         --  Can happen in configuration.  No real hidding.
+         return;
+      end if;
+
+      Warning_Msg_Sem (Warnid_Hide, +Decl,
+                       "declaration of %i hides %n", (+Decl, +Prev_Decl));
+   end Warning_Hide;
+
    --  Add interpretation DECL to the identifier of DECL.
    --  POTENTIALLY is true if the identifier comes from a use clause.
    procedure Add_Name (Decl : Iir; Ident : Name_Id; Potentially : Boolean)
@@ -913,12 +935,18 @@ package body Sem_Scopes is
          end if;
       end if;
 
-      -- Homograph, not in the same scope.
-      -- LRM §10.3:
-      -- A declaration is said to be hidden within (part of) an inner
-      -- declarative region if the inner region contains an homograph
-      -- of this declaration; the outer declaration is the hidden
-      -- within the immediate scope of the inner homograph.
+      --  Homograph, not in the same scope.
+      --  LRM §10.3:
+      --  A declaration is said to be hidden within (part of) an inner
+      --  declarative region if the inner region contains an homograph
+      --  of this declaration; the outer declaration is the hidden
+      --  within the immediate scope of the inner homograph.
+      if Is_Warning_Enabled (Warnid_Hide)
+        and then not Is_Potentially_Visible (Current_Inter)
+      then
+         Warning_Hide (Decl, Current_Decl);
+      end if;
+
       Add_New_Interpretation (True);
    end Add_Name;
 

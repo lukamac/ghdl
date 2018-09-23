@@ -43,7 +43,6 @@ package Trans.Chap3 is
    procedure Translate_Type_Subprograms
      (Decl : Iir; Kind : Subprg_Translate_Kind);
 
-   procedure Create_Type_Definition_Type_Range (Def : Iir);
    function Create_Static_Composite_Subtype_Bounds (Def : Iir) return O_Cnode;
 
    --  Same as Translate_type_definition only for std.standard.boolean and
@@ -72,7 +71,6 @@ package Trans.Chap3 is
    procedure Translate_Anonymous_Subtype_Definition
      (Def : Iir; With_Vars : Boolean);
 
-   --  Translate_type_definition_Elab do 4 and 6.
    --  It generates code to do type elaboration.
    procedure Elab_Type_Declaration (Decl : Iir);
    procedure Elab_Subtype_Declaration (Decl : Iir_Subtype_Declaration);
@@ -266,6 +264,11 @@ package Trans.Chap3 is
      (Alloc_Kind : Allocation_Kind;
       Res        : Mnode;
       Obj_Type   : Iir);
+
+   --  Used for alias: create the vars for the subtype of the name (when the
+   --  name is a slice).  The identifier prefix must have been set.
+   procedure Translate_Array_Subtype (Arr_Type : Iir);
+   procedure Elab_Array_Subtype (Arr_Type : Iir);
 
    --  Create the bounds for SUB_TYPE.
    --  SUB_TYPE is expected to be a non-static, anonymous array type.
