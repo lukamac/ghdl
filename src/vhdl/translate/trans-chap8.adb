@@ -2713,7 +2713,8 @@ package body Trans.Chap8 is
                      if Mode = Mode_Value then
                         if Get_Type_Staticness (Actual_Type) >= Globally then
                            Chap3.Create_Array_Subtype (Actual_Type);
-                           Bounds := Chap3.Get_Array_Type_Bounds (Actual_Type);
+                           Bounds :=
+                             Chap3.Get_Composite_Type_Bounds (Actual_Type);
                            Chap3.Translate_Object_Allocation
                              (Param, Alloc, Formal_Type, Bounds);
                         else
@@ -2877,7 +2878,7 @@ package body Trans.Chap8 is
                   Stabilize (Saved_Val (Pos));
 
                   Chap3.Copy_Bounds
-                    (Chap3.Bounds_To_Element_Bounds
+                    (Chap3.Record_Bounds_To_Element_Bounds
                        (Chap3.Get_Composite_Bounds
                           (Params (Last_Individual)),
                         Get_Selected_Element (Formal)),
@@ -2892,6 +2893,16 @@ package body Trans.Chap8 is
                  or else (Get_Interface_Of_Formal (Get_Formal (Next_Assoc))
                             /= Base_Formal)
                then
+                  --  * compute the size of the object
+                  Chap3.Gen_Call_Type_Builder
+                    (Chap3.Get_Composite_Bounds (Params (Last_Individual)),
+                     Get_Type (Base_Formal), Mode_Value);
+                  if Formal_Object_Kind = Mode_Signal then
+                     Chap3.Gen_Call_Type_Builder
+                       (Chap3.Get_Composite_Bounds (Params (Last_Individual)),
+                        Get_Type (Base_Formal), Mode_Signal);
+                  end if;
+
                   --  * allocate base
                   Chap3.Allocate_Unbounded_Composite_Base
                     (Alloc, Saved_Val (Last_Individual),
