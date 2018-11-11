@@ -1240,13 +1240,15 @@ package body Sem_Expr is
          A_Func := Get_Element (Imp_It);
 
          case Get_Kind (A_Func) is
-            when Iir_Kinds_Functions_And_Literals =>
+            when Iir_Kinds_Functions_And_Literals
+              | Iir_Kind_Interface_Function_Declaration =>
                if not Is_Func_Call then
                   --  The identifier of a function call must be a function or
                   --  an enumeration literal.
                   goto Continue;
                end if;
-            when Iir_Kind_Procedure_Declaration =>
+            when Iir_Kind_Procedure_Declaration
+              | Iir_Kind_Interface_Procedure_Declaration =>
                if Is_Func_Call then
                   --  The identifier of a procedure call must be a procedure.
                   goto Continue;
@@ -4078,6 +4080,19 @@ package body Sem_Expr is
       --  static expression with a non-locally static subtype.
       Set_Expr_Staticness (Expr, Min (Get_Expr_Staticness (Res),
                                       Get_Type_Staticness (N_Type)));
+
+      --  When possible, use the type of the expression as the type of the
+      --  qualified expression.
+      --  TODO: also handle unbounded subtypes, but only if this is a proper
+      --   subtype.
+      case Get_Kind (N_Type) is
+         when Iir_Kind_Array_Type_Definition
+           | Iir_Kind_Record_Type_Definition =>
+            Set_Type (Expr, Get_Type (Res));
+         when others =>
+            null;
+      end case;
+
       return Expr;
    end Sem_Qualified_Expression;
 
@@ -4810,7 +4825,13 @@ package body Sem_Expr is
       if Expr = Null_Iir then
          return;
       end if;
-      Expr_Type := Get_Type (Expr);
+
+      --  Use the base type; EXPR may define its own subtype (like in
+      --  qualified expression with forwarding) which must not be referenced
+      --  above it.  In any case, that also makes sense: we need to deal with
+      --  types, not with subtypes.
+      Expr_Type := Get_Base_Type (Get_Type (Expr));
+
       pragma Assert (Expr_Type /= Null_Iir);
       Result_Type := Compatible_Types_Intersect (Atype, Expr_Type);
       if Atype /= Null_Iir and then Is_Overload_List (Atype) then
