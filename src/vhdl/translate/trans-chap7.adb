@@ -2456,11 +2456,24 @@ package body Trans.Chap7 is
                Right_Tree, Ghdl_Real_Exp);
             return New_Convert_Ov (Res, Res_Otype);
          when Iir_Predefined_Integer_Exp =>
-            Res := Translate_Lib_Operator
-              (New_Convert_Ov (Left_Tree, Std_Integer_Otype),
-               Right_Tree,
-               Ghdl_Integer_Exp);
-            return New_Convert_Ov (Res, Res_Otype);
+            declare
+               Left_Tinfo : constant Type_Info_Acc :=
+                 Get_Info (Get_Type (Left));
+               Opr : O_Dnode;
+               Etype : O_Tnode;
+            begin
+               case Type_Mode_Integers (Left_Tinfo.Type_Mode) is
+                  when Type_Mode_I32 =>
+                     Opr := Ghdl_I32_Exp;
+                     Etype := Ghdl_I32_Type;
+                  when Type_Mode_I64 =>
+                     Opr := Ghdl_I64_Exp;
+                     Etype := Ghdl_I64_Type;
+               end case;
+               Res := Translate_Lib_Operator
+                 (New_Convert_Ov (Left_Tree, Etype), Right_Tree, Opr);
+               return New_Convert_Ov (Res, Res_Otype);
+            end;
 
          when Iir_Predefined_Array_Inequality
             | Iir_Predefined_Record_Inequality =>
@@ -2973,14 +2986,23 @@ package body Trans.Chap7 is
          El := Get_Association_Choices_Chain (Aggr);
          P := 0;
          loop
-            if El = Null_Iir then
-               return;
-            end if;
+            exit when El = Null_Iir;
             exit when Get_Kind (El) /= Iir_Kind_Choice_By_None;
             Do_Assign (El);
-            P := P + 1;
+            if not Final or else Get_Element_Type_Flag (El) then
+               P := P + 1;
+            else
+               P := P + Natural
+                 (Eval_Discrete_Type_Length
+                    (Get_Index_Type (Get_Type (Get_Associated_Expr (El)), 0)));
+            end if;
             El := Get_Chain (El);
          end loop;
+
+         --  End of chain.
+         if El = Null_Iir then
+            return;
+         end if;
 
          pragma Assert (Get_Kind (El) = Iir_Kind_Choice_By_Others);
 
