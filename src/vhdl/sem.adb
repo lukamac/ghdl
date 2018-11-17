@@ -15,7 +15,6 @@
 --  along with GHDL; see the file COPYING.  If not, write to the Free
 --  Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 --  02111-1307, USA.
-with Ada.Unchecked_Conversion;
 with Errorout; use Errorout;
 with Std_Package; use Std_Package;
 with Ieee.Std_Logic_1164;
@@ -28,9 +27,11 @@ with Sem_Specs; use Sem_Specs;
 with Sem_Decls; use Sem_Decls;
 with Sem_Assocs; use Sem_Assocs;
 with Sem_Inst;
+with Sem_Lib; use Sem_Lib;
 with Iirs_Utils; use Iirs_Utils;
 with Flags; use Flags;
 with Str_Table;
+with Sem_Utils;
 with Sem_Stmts; use Sem_Stmts;
 with Iir_Chains;
 with Xrefs; use Xrefs;
@@ -109,7 +110,7 @@ package body Sem is
          --  architecture body is in the declarative region of its entity,
          --  the entity name is directly visible.  But we cannot really use
          --  that rule as is, as we don't know which is the entity.
-         Entity := Libraries.Load_Primary_Unit
+         Entity := Load_Primary_Unit
            (Library, Get_Identifier (Name), Library_Unit);
          if Entity = Null_Iir then
             Error_Msg_Sem (+Library_Unit, "entity %n was not analysed", +Name);
@@ -203,7 +204,10 @@ package body Sem is
       if Vhdl_Std = Vhdl_02 then
          Open_Declarative_Region;
       end if;
+
+      Current_Psl_Default_Clock := Null_Iir;
       Sem_Block (Arch);
+
       if Vhdl_Std = Vhdl_02 then
          Close_Declarative_Region;
       end if;
@@ -929,7 +933,7 @@ package body Sem is
                --  declaration: at the place of the block specification in a
                --  block configuration for an external block whose interface
                --  is defined by that entity declaration.
-               Design := Libraries.Load_Secondary_Unit
+               Design := Load_Secondary_Unit
                  (Get_Design_Unit (Get_Entity (Father)),
                   Get_Identifier (Block_Spec),
                   Block_Conf);
@@ -994,10 +998,9 @@ package body Sem is
                   return;
                end if;
 
-               Design := Libraries.Load_Secondary_Unit
-                 (Get_Design_Unit (Entity),
-                  Get_Identifier (Block_Spec),
-                  Block_Conf);
+               Design := Load_Secondary_Unit (Get_Design_Unit (Entity),
+                                              Get_Identifier (Block_Spec),
+                                              Block_Conf);
                if Design = Null_Iir then
                   Error_Msg_Sem
                     (+Block_Conf, "no architecture %i", +Block_Spec);
@@ -1797,45 +1800,6 @@ package body Sem is
       end if;
    end Check_Operator_Requirements;
 
-   procedure Compute_Subprogram_Hash (Subprg : Iir)
-   is
-      type Hash_Type is mod 2**32;
-      function To_Hash is new Ada.Unchecked_Conversion
-        (Source => Iir, Target => Hash_Type);
-      function To_Int32 is new Ada.Unchecked_Conversion
-        (Source => Hash_Type, Target => Iir_Int32);
-
-      Kind : Iir_Kind;
-      Hash : Hash_Type;
-      Sig : Hash_Type;
-      Inter : Iir;
-      Itype : Iir;
-   begin
-      Kind := Get_Kind (Subprg);
-      if Kind = Iir_Kind_Function_Declaration
-        or else Kind = Iir_Kind_Enumeration_Literal
-      then
-         Itype := Get_Base_Type (Get_Return_Type (Subprg));
-         Hash := To_Hash (Itype);
-         Sig := 8;
-      else
-         Sig := 1;
-         Hash := 0;
-      end if;
-
-      if Kind /= Iir_Kind_Enumeration_Literal then
-         Inter := Get_Interface_Declaration_Chain (Subprg);
-         while Inter /= Null_Iir loop
-            Itype := Get_Base_Type (Get_Type (Inter));
-            Sig := Sig + 1;
-            Hash := Hash * 7 + To_Hash (Itype);
-            Hash := Hash + Hash / 2**28;
-            Inter := Get_Chain (Inter);
-         end loop;
-      end if;
-      Set_Subprogram_Hash (Subprg, To_Int32 (Hash + Sig));
-   end Compute_Subprogram_Hash;
-
    procedure Sem_Subprogram_Specification (Subprg: Iir)
    is
       Interface_Chain : Iir;
@@ -1940,7 +1904,7 @@ package body Sem is
 
       Check_Operator_Requirements (Get_Identifier (Subprg), Subprg);
 
-      Compute_Subprogram_Hash (Subprg);
+      Sem_Utils.Compute_Subprogram_Hash (Subprg);
 
       --  The specification has been analyzed, close the declarative region
       --  now.
@@ -2742,7 +2706,7 @@ package body Sem is
          declare
             Design_Unit: Iir_Design_Unit;
          begin
-            Design_Unit := Libraries.Load_Primary_Unit
+            Design_Unit := Load_Primary_Unit
               (Get_Library (Get_Design_File (Get_Current_Design_Unit)),
                Package_Ident, Decl);
             if Design_Unit = Null_Iir then
@@ -2878,7 +2842,7 @@ package body Sem is
       if Get_Need_Body (Pkg) and then not Is_Nested_Package (Pkg) then
          Bod := Get_Package_Body (Pkg);
          if Is_Null (Bod) then
-            Bod := Libraries.Load_Secondary_Unit
+            Bod := Load_Secondary_Unit
               (Get_Design_Unit (Pkg), Null_Identifier, Decl);
          else
             Bod := Get_Design_Unit (Bod);

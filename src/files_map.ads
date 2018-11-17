@@ -46,6 +46,11 @@ package Files_Map is
    function Read_Source_File (Directory : Name_Id; Name : Name_Id)
                               return Source_File_Entry;
 
+   --  Reserve an entry, but do not read any file.
+   function Reserve_Source_File
+     (Directory : Name_Id; Name : Name_Id; Length : Source_Ptr)
+     return Source_File_Entry;
+
    --  Each file in memory has two terminal EOT.
    EOT : constant Character := Character'Val (4);
 
@@ -89,7 +94,9 @@ package Files_Map is
    --  Likewise but return a pointer.  To be used only from non-Ada code.
    function Get_File_Buffer (File : Source_File_Entry) return File_Buffer_Ptr;
 
-   --  Return the length of the file (which is the size of the file buffer).
+   --  Set/Get the length of the file (which is less than the size of the
+   --  file buffer).  Set also append two EOT at the end of the file.
+   procedure Set_File_Length (File : Source_File_Entry; Length : Source_Ptr);
    function Get_File_Length (File : Source_File_Entry) return Source_Ptr;
 
    --  Return the name of the file.
@@ -178,6 +185,16 @@ package Files_Map is
                                 Line_Pos : out Source_Ptr;
                                 Line : out Natural;
                                 Offset : out Natural);
+
+   --  Convert a physical column to a logical column.
+   --  A physical column is the offset in byte from the first byte of the line.
+   --  A logical column is the position of the character when displayed.
+   --  A HT (tabulation) moves the cursor to the next position multiple of the
+   --  tab stop.
+   --  The first character is at position 1 and at offset 0.
+   function Coord_To_Col (File : Source_File_Entry;
+                          Line_Pos : Source_Ptr;
+                          Offset : Natural) return Natural;
 
    --  Translate coordinate into logical position.
    --  NAME is the name of the file,
