@@ -542,8 +542,7 @@ package body Trans.Chap4 is
                   Chap3.Translate_Object_Allocation
                     (Name_Node, Alloc_Kind, Obj_Type,
                      Chap3.Get_Composite_Bounds (S));
-                  Chap3.Translate_Object_Copy
-                    (Name_Node, M2Addr (S), Obj_Type);
+                  Chap3.Translate_Object_Copy (Name_Node, S, Obj_Type);
                end if;
             end;
          else
@@ -1159,9 +1158,7 @@ package body Trans.Chap4 is
             Data.Has_Val := False;
          else
             Data.Has_Val := True;
-            Data.Init_Val := E2M (Chap7.Translate_Expression (Value, Sig_Type),
-                                  Get_Info (Sig_Type),
-                                  Mode_Value);
+            Data.Init_Val := Chap7.Translate_Expression (Value, Sig_Type);
          end if;
       else
          --  Sub signal.

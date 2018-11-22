@@ -1045,6 +1045,7 @@ package body Trans.Chap3 is
    procedure Translate_Array_Subtype_Definition
      (Def : Iir_Array_Subtype_Definition; Parent_Type : Iir)
    is
+      El_Type   : constant Iir := Get_Element_Subtype (Def);
       Info      : constant Type_Info_Acc := Get_Info (Def);
       Pinfo     : constant Type_Info_Acc := Get_Info (Parent_Type);
 
@@ -1061,7 +1062,7 @@ package body Trans.Chap3 is
       Info.B := Pinfo.B;
       Info.S := Pinfo.S;
       if not Info.Type_Locally_Constrained
-        or else not Is_Static_Type (Get_Info (Get_Element_Subtype (Def)))
+        or else not Is_Static_Type (Get_Info (El_Type))
       then
          --  This is a complex type as the size is not known at compile
          --  time.
@@ -1070,7 +1071,10 @@ package body Trans.Chap3 is
          Info.Ortho_Ptr_Type := Pinfo.B.Base_Ptr_Type;
       else
          --  Length is known.  Create a constrained array.
-         El_Constrained := Get_Array_Element_Constraint (Def) /= Null_Iir;
+         --  True if this definition has constrained the element.
+         El_Constrained := Is_Fully_Constrained_Type (El_Type)
+           and then not Is_Fully_Constrained_Type (Get_Element_Subtype
+                                                     (Parent_Type));
          Info.Type_Mode := Type_Mode_Static_Array;
          Info.Ortho_Type (Mode_Signal) := O_Tnode_Null;
          Info.Ortho_Ptr_Type (Mode_Signal) := O_Tnode_Null;
@@ -3121,11 +3125,10 @@ package body Trans.Chap3 is
    --  Copy SRC to DEST.
    --  Both have the same type, OTYPE.
    procedure Translate_Object_Copy (Dest     : Mnode;
-                                    Src      : O_Enode;
+                                    Src      : Mnode;
                                     Obj_Type : Iir)
    is
       Info : constant Type_Info_Acc := Get_Info (Obj_Type);
-      Kind : constant Object_Kind_Type := Get_Object_Kind (Dest);
       D    : Mnode;
    begin
       case Info.Type_Mode is
@@ -3134,18 +3137,19 @@ package body Trans.Chap3 is
            | Type_Mode_Bounds_Acc
            | Type_Mode_File =>
             --  Scalar or thin pointer.
-            New_Assign_Stmt (M2Lv (Dest), Src);
+            New_Assign_Stmt (M2Lv (Dest), M2E (Src));
          when Type_Mode_Unbounded_Array
            | Type_Mode_Unbounded_Record =>
             --  a fat array.
             D := Stabilize (Dest);
             Gen_Memcpy (M2Addr (Get_Composite_Base (D)),
-                        M2Addr (Get_Composite_Base (E2M (Src, Info, Kind))),
+                        M2Addr (Get_Composite_Base (Src)),
                         Get_Object_Size (D, Obj_Type));
          when Type_Mode_Bounded_Arrays
             | Type_Mode_Bounded_Records =>
             D := Stabilize (Dest);
-            Gen_Memcpy (M2Addr (D), Src, Get_Object_Size (D, Obj_Type));
+            Gen_Memcpy (M2Addr (D), M2Addr (Src),
+                        Get_Object_Size (D, Obj_Type));
          when Type_Mode_Unknown
             | Type_Mode_Protected =>
             raise Internal_Error;

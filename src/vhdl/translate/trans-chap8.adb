@@ -254,13 +254,11 @@ package body Trans.Chap8 is
             begin
                Area := Dp2M (Subprg_Info.Res_Interface,
                              Ret_Info, Mode_Value);
-               Val := Stabilize
-                 (E2M (Chap7.Translate_Expression (Expr, Ret_Type),
-                  Ret_Info, Mode_Value));
+               Val := Stabilize (Chap7.Translate_Expression (Expr, Ret_Type));
                Chap3.Translate_Object_Allocation
                  (Area, Alloc_Return, Ret_Type,
                   Chap3.Get_Composite_Bounds (Val));
-               Chap3.Translate_Object_Copy (Area, M2Addr (Val), Ret_Type);
+               Chap3.Translate_Object_Copy (Area, Val, Ret_Type);
                Gen_Return;
             end;
          when Type_Mode_Bounded_Records
@@ -955,7 +953,7 @@ package body Trans.Chap8 is
             Targ_Node : Mnode;
          begin
             Targ_Node := Chap6.Translate_Name (Targ, Mode_Value);
-            Chap3.Translate_Object_Copy (Targ_Node, M2E (Val), Targ_Type);
+            Chap3.Translate_Object_Copy (Targ_Node, Val, Targ_Type);
          end;
       end if;
    end Translate_Variable_Aggregate_Assignment;
@@ -970,7 +968,7 @@ package body Trans.Chap8 is
    begin
       if Get_Kind (Target) = Iir_Kind_Aggregate then
          declare
-            E    : O_Enode;
+            E    : Mnode;
             Temp : Mnode;
          begin
             Chap3.Translate_Anonymous_Subtype_Definition (Targ_Type, False);
@@ -988,12 +986,36 @@ package body Trans.Chap8 is
       else
          Targ_Node := Chap6.Translate_Name (Target, Mode_Value);
          if Get_Kind (Expr) = Iir_Kind_Aggregate then
-            declare
-               E : O_Enode;
-            begin
-               E := Chap7.Translate_Expression (Expr, Targ_Type);
-               Chap3.Translate_Object_Copy (Targ_Node, E, Targ_Type);
-            end;
+            if Get_Constraint_State (Get_Type (Expr)) /= Fully_Constrained then
+               declare
+                  Expr_Type : constant Iir := Get_Type (Expr);
+                  Expr_Tinfo : constant Type_Info_Acc := Get_Info (Expr_Type);
+                  Val : Mnode;
+               begin
+                  --  Create a temp.
+                  Val := Create_Temp (Expr_Tinfo);
+                  --  Set bounds from target
+                  Stabilize (Targ_Node);
+                  New_Assign_Stmt
+                    (M2Lp (Chap3.Get_Composite_Bounds (Val)),
+                     M2Addr (Chap3.Get_Composite_Bounds (Targ_Node)));
+                  --  Allocate target
+                  Chap3.Allocate_Unbounded_Composite_Base
+                    (Alloc_Stack, Val, Get_Base_Type (Expr_Type));
+                  --  Translate aggregate
+                  Chap7.Translate_Aggregate (Val, Targ_Type, Expr);
+                  --  Assign
+                  Chap3.Translate_Object_Copy (Targ_Node, Val, Targ_Type);
+               end;
+            else
+               --  In case of overlap: be sure to use an intermediate variable.
+               declare
+                  E : Mnode;
+               begin
+                  E := Chap7.Translate_Expression (Expr, Targ_Type);
+                  Chap3.Translate_Object_Copy (Targ_Node, E, Targ_Type);
+               end;
+            end if;
          else
             Chap7.Translate_Assign (Targ_Node, Expr, Targ_Type);
          end if;
@@ -2606,8 +2628,7 @@ package body Trans.Chap8 is
 
       --  Individual association: assign the individual actual of
       --  the whole actual.
-      procedure Trans_Individual_Assign
-        (Assoc : Iir; Val : O_Enode; Sig : O_Enode)
+      procedure Trans_Individual_Assign (Assoc : Iir; Val : Mnode; Sig : Mnode)
       is
          Formal : constant Iir := Get_Formal (Assoc);
          Formal_Type : constant Iir := Get_Type (Formal);
@@ -2623,7 +2644,7 @@ package body Trans.Chap8 is
            (Formal, Formal_Info, Params (Last_Individual),
             Formal_Object_Kind);
          if Formal_Object_Kind = Mode_Value then
-            Chap7.Translate_Assign (Param, Val, Act, Formal_Type, Assoc);
+            Chap7.Translate_Assign (Param, M2E (Val), Act, Formal_Type, Assoc);
          else
             Chap3.Translate_Object_Copy (Param, Sig, Formal_Type);
             if Is_Suspendable then
@@ -2632,7 +2653,7 @@ package body Trans.Chap8 is
                Assoc_Info := Get_Info (Assoc);
                New_Assign_Stmt
                  (Get_Var (Assoc_Info.Call_Assoc_Value (Mode_Value)),
-                  Val);
+                  M2E (Val));
             else
                --  Assign the value to the whole object, as there is
                --  only one call.
@@ -2667,6 +2688,7 @@ package body Trans.Chap8 is
          Val : O_Enode;
          Sig : O_Enode;
          Mval : Mnode;
+         Msig : Mnode;
          Mode : Iir_Mode;
          Bounds : Mnode;
          Next_Assoc : Iir;
@@ -2940,11 +2962,10 @@ package body Trans.Chap8 is
                      Next_Assoc := Get_Chain (Next_Assoc);
                      if Formal_Object_Kind = Mode_Signal then
                         Trans_Individual_Assign
-                          (Next_Assoc,
-                           M2E (Saved_Val (I)), M2E (Saved_Sig (I)));
+                          (Next_Assoc, Saved_Val (I), Saved_Sig (I));
                      else
                         Trans_Individual_Assign
-                          (Next_Assoc, M2E (Saved_Val (I)), O_Enode_Null);
+                          (Next_Assoc, Saved_Val (I), Mnode_Null);
                      end if;
                   end loop;
 
@@ -2954,7 +2975,15 @@ package body Trans.Chap8 is
             else
                --  Individual association: assign the individual actual of
                --  the whole actual.
-               Trans_Individual_Assign (Assoc, Val, Sig);
+               if Sig = O_Enode_Null then
+                  --  Arghh..
+                  Msig := Mnode_Null;
+               else
+                  Msig := E2M (Sig, Get_Info (Formal_Type), Mode_Signal);
+               end if;
+               --  Note: Ftype_Info may be null (if the formal is a slice).
+               Trans_Individual_Assign
+                 (Assoc, E2M (Val, Get_Info (Formal_Type), Mode_Value), Msig);
             end if;
          elsif Assoc_Info /= null then
             --  For suspendable caller, write the actual to the state
@@ -3035,8 +3064,7 @@ package body Trans.Chap8 is
                           (Formal_Type, Alloc_Return, Param);
                         Assign_Params_Field (M2Addr (Param), Mode);
                      end if;
-                     Chap3.Translate_Object_Copy
-                       (Param, M2E (Mval), Formal_Type);
+                     Chap3.Translate_Object_Copy (Param, Mval, Formal_Type);
                   end if;
                end;
             end loop;
@@ -3058,7 +3086,10 @@ package body Trans.Chap8 is
             --  Not for signals.
             pragma Assert (Sig = O_Enode_Null);
 
-            Chap3.Translate_Object_Copy (Inout_Params (Pos), Val, Formal_Type);
+            Chap3.Translate_Object_Copy
+              (Inout_Params (Pos),
+               E2M (Val, Get_Info (Formal_Type), Mode_Value),
+               Formal_Type);
             E_Params (Pos) := M2Addr (Inout_Params (Pos));
          else
             E_Params (Pos) := Val;
@@ -4045,7 +4076,7 @@ package body Trans.Chap8 is
          end;
       else
          Src := Chap6.Translate_Name (Target, Mode_Signal);
-         Chap3.Translate_Object_Copy (Aggr, M2E (Src), Target_Type);
+         Chap3.Translate_Object_Copy (Aggr, Src, Target_Type);
       end if;
    end Translate_Signal_Target_Aggr;
 
@@ -4174,27 +4205,54 @@ package body Trans.Chap8 is
       Prepare_Data_Record => Gen_Signal_Direct_Prepare_Data_Stabilize,
       Update_Data_Record => Gen_Signal_Direct_Update_Data_Record);
 
+   procedure Translate_Waveform_Expression
+     (Expr : Iir; Target_Type : Iir; Targ : in out Mnode; Res : out Mnode)
+   is
+      Expr_Type : constant Iir := Get_Type (Expr);
+   begin
+      if Get_Kind (Expr) = Iir_Kind_Aggregate
+        and then Get_Constraint_State (Expr_Type) /= Fully_Constrained
+      then
+         declare
+            Expr_Tinfo : constant Type_Info_Acc := Get_Info (Expr_Type);
+         begin
+            --  Create a temp.
+            Res := Create_Temp (Expr_Tinfo);
+            --  Set bounds from target
+            Stabilize (Targ);
+            New_Assign_Stmt
+              (M2Lp (Chap3.Get_Composite_Bounds (Res)),
+               M2Addr (Chap3.Get_Composite_Bounds (Targ)));
+            --  Allocate target
+            Chap3.Allocate_Unbounded_Composite_Base
+              (Alloc_Stack, Res, Get_Base_Type (Expr_Type));
+            --  Translate aggregate
+            Chap7.Translate_Aggregate (Res, Target_Type, Expr);
+         end;
+      else
+         Res := Chap7.Translate_Expression (Expr, Target_Type);
+      end if;
+   end Translate_Waveform_Expression;
+
    procedure Translate_Direct_Signal_Assignment
      (Target : Iir; Targ : Mnode; Drv : Mnode; We : Iir)
    is
       Target_Type  : constant Iir := Get_Type (Target);
       Target_Tinfo : constant Type_Info_Acc := Get_Info (Target_Type);
       Arg          : Signal_Direct_Assign_Data;
-      Expr         : Mnode;
+      Val          : Mnode;
       Stable_Targ  : Mnode;
    begin
-      Expr := E2M (Chap7.Translate_Expression (We, Target_Type),
-                   Target_Tinfo, Mode_Value);
+      Stable_Targ := Targ;
+      Translate_Waveform_Expression (We, Target_Type, Stable_Targ, Val);
       if Is_Composite (Target_Tinfo) then
-         Stabilize (Expr);
-         Stable_Targ := Stabilize (Targ);
+         Stabilize (Val);
+         Stabilize (Stable_Targ);
          Chap3.Check_Array_Match
-           (Target_Type, Stable_Targ, Get_Type (We), Expr, We);
-      else
-         Stable_Targ := Targ;
+           (Target_Type, Stable_Targ, Get_Type (We), Val, We);
       end if;
       Arg := (Drv => Drv,
-              Expr => Expr,
+              Expr => Val,
               Expr_Node => We);
       Gen_Signal_Direct_Assign (Stable_Targ, Target_Type, Arg);
    end Translate_Direct_Signal_Assignment;
@@ -4292,22 +4350,19 @@ package body Trans.Chap8 is
       if Mechanism = Signal_Assignment_Simple then
          declare
             Targ_Tinfo : constant Type_Info_Acc := Get_Info (Target_Type);
-            Val : O_Enode;
-            Stable_Val : Mnode;
+            Val : Mnode;
             Targ2 : Mnode;
          begin
             Open_Temp;
-            Val := Chap7.Translate_Expression (Value, Target_Type);
+            Targ2 := Targ;
+            Translate_Waveform_Expression (Value, Target_Type, Targ2, Val);
             if Is_Composite (Targ_Tinfo) then
-               Stable_Val := Stabilize (E2M (Val, Targ_Tinfo, Mode_Value));
-               Targ2 := Stabilize (Targ);
+               Stabilize (Targ2);
+               Stabilize (Val);
                Chap3.Check_Array_Match
-                 (Target_Type, Targ2, Get_Type (Value), Stable_Val, Wf_Chain);
-               Val := M2E (Stable_Val);
-            else
-               Targ2 := Targ;
+                 (Target_Type, Targ2, Get_Type (Value), Val, Wf_Chain);
             end if;
-            Gen_Simple_Signal_Assign (Targ2, Target_Type, Val);
+            Gen_Simple_Signal_Assign (Targ2, Target_Type, M2E (Val));
             Close_Temp;
          end;
          return;
@@ -4363,9 +4418,9 @@ package body Trans.Chap8 is
             if Get_Kind (Value) = Iir_Kind_Null_Literal then
                Val := Mnode_Null;
             else
-               Val := E2M (Chap7.Translate_Expression (Value, Target_Type),
-                           Targ_Tinfo, Mode_Value);
-               Val := Stabilize (Val);
+               Translate_Waveform_Expression
+                 (Value, Target_Type, Var_Targ, Val);
+               Stabilize (Val);
                Chap3.Check_Array_Match
                  (Target_Type, Var_Targ, Get_Type (Value), Val, We);
             end if;
@@ -4395,8 +4450,7 @@ package body Trans.Chap8 is
                if Get_Kind (Value) = Iir_Kind_Null_Literal then
                   Val := Mnode_Null;
                else
-                  Val := E2M (Chap7.Translate_Expression (Value, Target_Type),
-                              Targ_Tinfo, Mode_Value);
+                  Val := Chap7.Translate_Expression (Value, Target_Type);
                   if Is_Composite (Targ_Tinfo) then
                      Stabilize (Val);
                      Chap3.Check_Array_Match
