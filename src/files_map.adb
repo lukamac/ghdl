@@ -104,7 +104,7 @@ package body Files_Map is
    --  Add a new entry in the lines_table.
    --  The new entry must be the next one after the last entry.
    procedure File_Add_Line_Number
-     (File: Source_File_Entry; Line: Natural; Pos: Source_Ptr)
+     (File : Source_File_Entry; Line : Positive; Pos : Source_Ptr)
    is
       use Lines_Tables;
 
@@ -340,7 +340,7 @@ package body Files_Map is
 
    procedure Location_To_Position (Location : Location_Type;
                                    Name : out Name_Id;
-                                   Line : out Natural;
+                                   Line : out Positive;
                                    Col : out Natural)
    is
       File : Source_File_Entry;
@@ -354,7 +354,7 @@ package body Files_Map is
    procedure Location_To_Coord (Location : Location_Type;
                                 File : out Source_File_Entry;
                                 Line_Pos : out Source_Ptr;
-                                Line : out Natural;
+                                Line : out Positive;
                                 Offset : out Natural)
    is
       Pos : Source_Ptr;
@@ -388,11 +388,11 @@ package body Files_Map is
    end Location_File_To_Pos;
 
    function Location_File_To_Line
-     (Location : Location_Type; File : Source_File_Entry) return Natural
+     (Location : Location_Type; File : Source_File_Entry) return Positive
    is
       Line_Pos : Source_Ptr;
-      Line     : Natural;
-      Offset   :  Natural;
+      Line     : Positive;
+      Offset   : Natural;
    begin
       Location_To_Coord
         (Source_Files.Table (File), Location_File_To_Pos (Location, File),
@@ -401,7 +401,7 @@ package body Files_Map is
    end Location_File_To_Line;
 
    function Location_File_Line_To_Col
-     (Loc : Location_Type; File : Source_File_Entry; Line : Natural)
+     (Loc : Location_Type; File : Source_File_Entry; Line : Positive)
      return Natural
    is
       F : Source_File_Record renames Source_Files.Table (File);
@@ -555,7 +555,9 @@ package body Files_Map is
                                    File_Length => 0,
                                    Lines => <>,
                                    Cache_Pos => Source_Ptr_Org,
-                                   Cache_Line => 1);
+                                   Cache_Line => 1,
+                                   Gap_Start => Source_Ptr_Last,
+                                   Gap_Last => Source_Ptr_Last);
       Lines_Tables.Init (Source_Files.Table (Res).Lines);
       File_Add_Line_Number (Res, 1, Source_Ptr_Org);
       return Res;
@@ -766,6 +768,12 @@ package body Files_Map is
 
       Set_File_Length (Res, Length);
 
+      --  Set the gap.
+      Source_Files.Table (Res).Gap_Start :=
+        Source_Ptr_Org + Length + 2;
+      Source_Files.Table (Res).Gap_Last :=
+        Source_Files.Table (Res).Source'Last;
+
       --  Compute the SHA1.
       declare
          use GNAT.SHA1;
@@ -818,6 +826,16 @@ package body Files_Map is
         Source_Files.Table (Source_Files.Last).Last_Location + 1;
    end Unload_Last_Source_File;
 
+   procedure Skip_Gap (File : Source_File_Entry; Pos : in out Source_Ptr)
+   is
+      pragma Assert (File <= Source_Files.Last);
+      F : Source_File_Record renames Source_Files.Table (File);
+   begin
+      if Pos = F.Gap_Start then
+         Pos := F.Gap_Last + 1;
+      end if;
+   end Skip_Gap;
+
    --  Check validity of FILE.
    --  Raise an exception in case of error.
    procedure Check_File (File : Source_File_Entry) is
@@ -850,7 +868,7 @@ package body Files_Map is
       begin
          pragma Assert (Length <= Buffer'Length - 2);
 
-         F.File_Length := Natural (Length);
+         F.File_Length := Length;
          Buffer (Source_Ptr_Org + Length) := EOT;
          Buffer (Source_Ptr_Org + Length + 1) := EOT;
       end;
@@ -860,7 +878,7 @@ package body Files_Map is
    function Get_File_Length (File: Source_File_Entry) return Source_Ptr is
    begin
       Check_File (File);
-      return Source_Ptr (Source_Files.Table (File).File_Length);
+      return Source_Files.Table (File).File_Length;
    end Get_File_Length;
 
    --  Return the name of the file.
@@ -884,7 +902,7 @@ package body Files_Map is
       return Source_Files.Table (File).Directory;
    end Get_Source_File_Directory;
 
-   function Line_To_Position (File : Source_File_Entry; Line : Natural)
+   function Line_To_Position (File : Source_File_Entry; Line : Positive)
                              return Source_Ptr
    is
       pragma Assert (File <= Source_Files.Last);
@@ -1062,7 +1080,7 @@ package body Files_Map is
    end Extract_Expanded_Line;
 
    function Extract_Expanded_Line (File : Source_File_Entry;
-                                   Line : Natural) return String
+                                   Line : Positive) return String
    is
       Start : constant Source_Ptr := Line_To_Position (File, Line);
    begin
@@ -1102,7 +1120,7 @@ package body Files_Map is
             Put (Source_File_Entry'Image (I));
             Put (" name: " & Image (F.File_Name));
             Put (" dir:" & Image (F.Directory));
-            Put (" length:" & Natural'Image (F.File_Length));
+            Put (" length:" & Source_Ptr'Image (F.File_Length));
             New_Line;
             Put (" location:" & Location_Type'Image (F.First_Location)
                    & " -" & Location_Type'Image (F.Last_Location));

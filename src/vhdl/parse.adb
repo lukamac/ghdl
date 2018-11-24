@@ -1786,12 +1786,8 @@ package body Parse is
          end case;
       end loop;
 
-      if Current_Token /= Tok_Right_Paren then
-         Error_Msg_Parse ("')' expected at end of interface list");
-      end if;
-
       --  Skip ')'
-      Scan;
+      Expect_Scan (Tok_Right_Paren, "')' expected at end of interface list");
 
       return Res;
    end Parse_Interface_List;
@@ -2269,7 +2265,7 @@ package body Parse is
 
          First := Null_Iir;
          Scan_Semi_Colon ("element declaration");
-         exit when Current_Token = Tok_End;
+         exit when Current_Token /= Tok_Identifier;
       end loop;
 
       Set_Elements_Declaration_List (Res, List_To_Flist (El_List));
@@ -2280,11 +2276,9 @@ package body Parse is
       end if;
 
       --  Skip 'end'
-      Scan_Expect (Tok_Record);
+      Expect_Scan (Tok_End);
+      Expect_Scan (Tok_Record);
       Set_End_Has_Reserved_Id (Res, True);
-
-      --  Skip 'record'
-      Scan;
 
       return Res;
    end Parse_Record_Type_Definition;
@@ -2644,10 +2638,9 @@ package body Parse is
                   Set_Identifier (El, Id);
                   Set_Resolution_Indication (El, Parse_Resolution_Indication);
                   Sub_Chain_Append (First, Last, El);
-                  exit when Current_Token = Tok_Right_Paren;
+                  exit when Current_Token /= Tok_Comma;
 
                   --  Eat ','
-                  Expect (Tok_Comma);
                   Scan;
 
                   if Current_Token /= Tok_Identifier then
@@ -2669,8 +2662,7 @@ package body Parse is
          end if;
 
          --  Eat ')'
-         Expect (Tok_Right_Paren);
-         Scan;
+         Expect_Scan (Tok_Right_Paren);
 
          return Def;
       else
@@ -8871,11 +8863,19 @@ package body Parse is
                   --  The identifier was a label from an instantiation list.
                   List := Create_Iir_List;
                   Append_Element (List, El);
-                  loop
-                     Scan_Expect (Tok_Identifier);
-                     Append_Element (List, Current_Text);
+                  while Current_Token = Tok_Comma loop
+                     --  Skip ','.
                      Scan;
-                     exit when Current_Token /= Tok_Comma;
+
+                     if Current_Token = Tok_Identifier then
+                        Append_Element (List, Current_Text);
+
+                        --  Skip identifier.
+                        Scan;
+                     else
+                        Expect (Tok_Identifier);
+                        exit;
+                     end if;
                   end loop;
                   Flist := List_To_Flist (List);
                   return Parse_Component_Configuration (Loc, Flist);
@@ -9364,10 +9364,7 @@ package body Parse is
       First := Ref;
       Last := Ref;
 
-      loop
-         exit when Current_Token = Tok_Semi_Colon;
-         Expect (Tok_Comma);
-
+      while Current_Token = Tok_Comma loop
          --  Skip ','.
          Scan;
 
@@ -9378,6 +9375,8 @@ package body Parse is
          Set_Context_Reference_Chain (Last, Ref);
          Last := Ref;
       end loop;
+
+      Expect (Tok_Semi_Colon);
 
       return First;
    end Parse_Context_Reference;
