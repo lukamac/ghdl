@@ -1,5 +1,6 @@
 Write-Host "Installing dependencies ..." -Foreground Yellow
 Write-Host "----------------------------------------" -Foreground Yellow
+Write-Host "Installing MinGW64 packages ..." -Foreground Yellow
 
 C:\msys64\usr\bin\pacman.exe -V
 # list installed packages and versions
@@ -18,7 +19,7 @@ if ($env:BUILD_MINGW -eq "mingw32")
 	{
 	}
 	elseif ($env:BUILD_BACKEND -eq "llvm")
-	{	C:\msys64\usr\bin\pacman.exe -S mingw-w64-i686-llvm35 mingw-w64-i686-clang35 --noconfirm
+	{	C:\msys64\usr\bin\pacman.exe -S mingw-w64-i686-llvm mingw-w64-i686-clang --noconfirm
 	}
 }
 elseif ($env:BUILD_MINGW -eq "mingw64")
@@ -27,21 +28,8 @@ elseif ($env:BUILD_MINGW -eq "mingw64")
 	{
 	}
 	elseif ($env:BUILD_BACKEND -eq "llvm")
-	{	C:\msys64\usr\bin\pacman.exe -S mingw-w64-x86_64-llvm35 mingw-w64-x86_64-clang35 --noconfirm
+	{	C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-llvm mingw-w64-x86_64-clang --noconfirm
 	}
-}
-
-if ($env:BUILD_BACKEND -eq "gcc")
-{	# Assembles paths
-	$GCC_SOURCE_DIR =     "$($env:APPVEYOR_BUILD_FOLDER)\gcc-$BUILD_GCC_VERSION"
-	# Export GCC paths as environment variable
-	$env:GCC_SOURCE_DIR = $GCC_SOURCE_DIR
-
-	cd $env:APPVEYOR_BUILD_FOLDER
-	Write-Host "Downloading GCC $BUILD_GCC_VERSION sources ..." -Foreground Yellow
-	wget https://ftp.gnu.org/gnu/gcc/gcc-$BUILD_GCC_VERSION/gcc-$BUILD_GCC_VERSION.tar.gz
-	Write-Host "Extracting GCC sources ..." -Foreground Yellow
-	tar xzf gcc-$BUILD_GCC_VERSION.tar.gz
 }
 
 Write-Host "Installing NuGet as PackageProvider ..." -Foreground Yellow
@@ -52,6 +40,8 @@ Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
 Write-Host "Installing PowerShell modules ..." -Foreground Yellow
 Install-Module Pscx -AllowClobber
 
+#Write-Host "Check all Write-* CmdLets ..." -Foreground Yellow
+#Get-Command -Verb Write | Format-Table
 
 cd $env:APPVEYOR_BUILD_FOLDER
 exit $LastExitCode
