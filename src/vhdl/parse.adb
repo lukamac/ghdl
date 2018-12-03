@@ -2869,12 +2869,12 @@ package body Parse is
    begin
       Decl := Create_Iir (Iir_Kind_Subtype_Declaration);
       Set_Parent (Decl, Parent);
-      Set_Location (Decl);
       Start_Loc := Get_Token_Location;
 
       --  Eat 'subtype'.
       Scan;
 
+      Set_Location (Decl);
       if Current_Token = Tok_Identifier then
          Set_Identifier (Decl, Current_Identifier);
 
@@ -3634,21 +3634,24 @@ package body Parse is
       Set_Location (Res);
 
       case Current_Token is
-         when Tok_Identifier =>
+         when Tok_Identifier
+           | Tok_Character =>
             Ident := Current_Identifier;
-         when Tok_Character =>
-            Ident := Current_Identifier;
+
+            --  Skip identifier/character.
+            Scan;
          when Tok_String =>
             Ident := Scan_To_Operator_Name (Get_Token_Location);
+
+            --  Skip operator.
+            Scan;
             --  FIXME: vhdl87
             --  FIXME: operator symbol.
          when others =>
             Error_Msg_Parse ("alias designator expected");
+            Ident := Null_Identifier;
       end case;
-
-      --  Skip identifier.
       Set_Identifier (Res, Ident);
-      Scan;
 
       if Current_Token = Tok_Colon then
          --  Skip ':'.
@@ -7559,11 +7562,10 @@ package body Parse is
          Parse_Declarative_Part (Res);
       end if;
 
-      Expect (Tok_Begin);
       Begin_Loc := Get_Token_Location;
 
       --  Eat 'begin'.
-      Scan;
+      Expect_Scan (Tok_Begin);
 
       Parse_Concurrent_Statements (Res);
 
@@ -7693,8 +7695,7 @@ package body Parse is
 
       --  Skip 'end'
       End_Loc := Get_Token_Location;
-      Expect (Tok_End);
-      Scan;
+      Expect_Scan (Tok_End);
 
       if Vhdl_Std >= Vhdl_08 and then Current_Token /= Tok_Generate then
          --  This is the 'end' of the generate_statement_body.
@@ -7874,8 +7875,7 @@ package body Parse is
 
          --  Skip 'generate'
          Generate_Loc := Get_Token_Location;
-         Expect (Tok_Generate);
-         Scan;
+         Expect_Scan (Tok_Generate);
 
          Parse_Generate_Statement_Body (Res, Alt_Label, Bod, End_Loc);
 
@@ -7929,18 +7929,15 @@ package body Parse is
             --  Skip identifier
             Scan;
 
-            Expect (Tok_Colon);
-
             --  Skip ':'
-            Scan;
+            Expect_Scan (Tok_Colon);
          else
             Alt_Label := Null_Identifier;
          end if;
 
          --  Skip 'generate'
          Generate_Loc := Get_Token_Location;
-         Expect (Tok_Generate);
-         Scan;
+         Expect_Scan (Tok_Generate);
 
          Parse_Generate_Statement_Body (Res, Alt_Label, Bod, End_Loc);
          if Alt_Label /= Null_Identifier then
@@ -7960,11 +7957,9 @@ package body Parse is
          end if;
       end if;
 
-      Expect (Tok_Generate);
-      Set_End_Has_Reserved_Id (Res, True);
-
       --  Skip 'generate'
-      Scan;
+      Expect_Scan (Tok_Generate);
+      Set_End_Has_Reserved_Id (Res, True);
 
       --  LRM93 9.7
       --  If a label appears at the end of a generate statement, it must repeat
