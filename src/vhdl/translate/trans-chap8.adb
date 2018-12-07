@@ -376,14 +376,6 @@ package body Trans.Chap8 is
       end if;
    end Translate_If_Statement;
 
-   function Get_Range_Ptr_Field_Value (O_Range : O_Lnode; Field : O_Fnode)
-                                          return O_Enode
-   is
-   begin
-      return New_Value (New_Selected_Element
-                        (New_Access_Element (New_Value (O_Range)), Field));
-   end Get_Range_Ptr_Field_Value;
-
    --  Inc or dec ITERATOR according to DIR.
    procedure Gen_Update_Iterator_Common (Val      : Unsigned_64;
                                          Itype    : Iir;
@@ -452,6 +444,56 @@ package body Trans.Chap8 is
                        New_Dyadic_Op (Op, New_Value (Get_Var (Iterator)), V));
    end Gen_Update_Iterator;
 
+   function Is_For_Loop_Iterator_Stable (Iterator : Iir) return Boolean
+   is
+      Iter_Type : constant Iir := Get_Type (Iterator);
+      Constraint : constant Iir := Get_Range_Constraint (Iter_Type);
+      Name : Iir;
+   begin
+      --  A constraint is either a range expression or a range attribute name.
+      pragma Assert (Get_Kind (Constraint) in Iir_Kinds_Range_Attribute);
+
+      Name := Get_Prefix (Constraint);
+      Name := Get_Base_Name (Name);
+
+      case Get_Kind (Name) is
+         when Iir_Kind_Implicit_Dereference
+           | Iir_Kind_Dereference =>
+            return False;
+         when Iir_Kind_Function_Call =>
+            if not Is_Fully_Constrained_Type (Get_Type (Name)) then
+               return False;
+            end if;
+         when Iir_Kinds_Object_Declaration =>
+            null;
+         when Iir_Kind_Subtype_Declaration =>
+            null;
+         when others =>
+            Error_Kind ("is_for_loop_iterator_stable(2)", Name);
+      end case;
+      return True;
+   end Is_For_Loop_Iterator_Stable;
+
+   function Get_Iterator_Range_Var (Iterator : Iir) return Mnode
+   is
+      Iter_Type : constant Iir := Get_Type (Iterator);
+      Iter_Type_Info : constant Type_Info_Acc :=
+        Get_Info (Get_Base_Type (Iter_Type));
+      It_Info : constant Ortho_Info_Acc := Get_Info (Iterator);
+   begin
+      if It_Info.Iterator_Range_Copy then
+         return Lv2M (Get_Var (It_Info.Iterator_Range),
+                      Iter_Type_Info, Mode_Value,
+                      Iter_Type_Info.B.Range_Type,
+                      Iter_Type_Info.B.Range_Ptr_Type);
+      else
+         return Lp2M (Get_Var (It_Info.Iterator_Range),
+                      Iter_Type_Info, Mode_Value,
+                      Iter_Type_Info.B.Range_Type,
+                      Iter_Type_Info.B.Range_Ptr_Type);
+      end if;
+   end Get_Iterator_Range_Var;
+
    procedure Translate_For_Loop_Statement_Declaration (Stmt : Iir)
    is
       Iterator : constant Iir := Get_Parameter_Specification (Stmt);
@@ -460,6 +502,7 @@ package body Trans.Chap8 is
         Get_Info (Get_Base_Type (Iter_Type));
       Constraint     : constant Iir := Get_Range_Constraint (Iter_Type);
       It_Info : Ortho_Info_Acc;
+      Range_Type : O_Tnode;
    begin
       --  Iterator range.
       Chap3.Translate_Object_Subtype (Iterator, False);
@@ -477,10 +520,22 @@ package body Trans.Chap8 is
             Iter_Type_Info.Ortho_Type (Mode_Value),
             O_Storage_Local);
       else
+         --  The range must be copied if:
+         --  * the constraint is 'range or 'reverse_range, or 'subtype, or
+         --    'element (ie any attribute ?)
+         --  * the base name is a function_call returning an unbounded value,
+         --    or a dereference.
+         --  Note: in case of a dereference, the anonymous object can be
+         --  deallocated within the loop.
+         It_Info.Iterator_Range_Copy :=
+           not Is_For_Loop_Iterator_Stable (Iterator);
+         if It_Info.Iterator_Range_Copy then
+            Range_Type := Iter_Type_Info.B.Range_Type;
+         else
+            Range_Type := Iter_Type_Info.B.Range_Ptr_Type;
+         end if;
          It_Info.Iterator_Range := Create_Var
-           (Create_Var_Identifier ("IT_RANGE"),
-            Iter_Type_Info.B.Range_Ptr_Type,
-            O_Storage_Local);
+           (Create_Var_Identifier ("IT_RANGE"), Range_Type, O_Storage_Local);
       end if;
    end Translate_For_Loop_Statement_Declaration;
 
@@ -494,6 +549,7 @@ package body Trans.Chap8 is
       Constraint     : constant Iir := Get_Range_Constraint (Iter_Type);
       Dir            : Iir_Direction;
       Op             : ON_Op_Kind;
+      Rng            : O_Lnode;
    begin
       if Get_Kind (Constraint) = Iir_Kind_Range_Expression then
          New_Assign_Stmt
@@ -517,20 +573,25 @@ package body Trans.Chap8 is
             New_Value (Get_Var (It_Info.Iterator_Right)),
             Ghdl_Bool_Type);
       else
-         New_Assign_Stmt (Get_Var (It_Info.Iterator_Range),
-                          New_Address (Chap7.Translate_Range
-                                         (Constraint, Iter_Base_Type),
-                                       Iter_Type_Info.B.Range_Ptr_Type));
+         Rng := Chap7.Translate_Range (Constraint, Iter_Base_Type);
+         if It_Info.Iterator_Range_Copy then
+            Gen_Memcpy (M2Addr (Get_Iterator_Range_Var (Iterator)),
+                        New_Address (Rng, Iter_Type_Info.B.Range_Ptr_Type),
+                        New_Lit (New_Sizeof (Iter_Type_Info.B.Range_Type,
+                                             Ghdl_Index_Type)));
+         else
+            New_Assign_Stmt
+              (Get_Var (It_Info.Iterator_Range),
+               New_Address (Rng, Iter_Type_Info.B.Range_Ptr_Type));
+         end if;
          New_Assign_Stmt
            (Get_Var (It_Info.Iterator_Var),
-            Get_Range_Ptr_Field_Value (Get_Var (It_Info.Iterator_Range),
-                                       Iter_Type_Info.B.Range_Left));
+            M2E (Chap3.Range_To_Left (Get_Iterator_Range_Var (Iterator))));
          --  Before starting the loop, check whether there will be at least
          --  one iteration.
          Cond := New_Compare_Op
            (ON_Gt,
-            Get_Range_Ptr_Field_Value (Get_Var (It_Info.Iterator_Range),
-                                       Iter_Type_Info.B.Range_Length),
+            M2E (Chap3.Range_To_Length (Get_Iterator_Range_Var (Iterator))),
             New_Lit (Ghdl_Index_0),
             Ghdl_Bool_Type);
       end if;
@@ -539,8 +600,6 @@ package body Trans.Chap8 is
    procedure Exit_Cond_For_Loop (Iterator : Iir; Cond : out O_Enode)
    is
       Iter_Type      : constant Iir := Get_Type (Iterator);
-      Iter_Base_Type : constant Iir := Get_Base_Type (Iter_Type);
-      Iter_Type_Info : constant Ortho_Info_Acc := Get_Info (Iter_Base_Type);
       It_Info        : constant Ortho_Info_Acc := Get_Info (Iterator);
       Constraint     : constant Iir := Get_Range_Constraint (Iter_Type);
       Val            : O_Enode;
@@ -551,8 +610,7 @@ package body Trans.Chap8 is
       if Get_Kind (Constraint) = Iir_Kind_Range_Expression then
          Val := New_Value (Get_Var (It_Info.Iterator_Right));
       else
-         Val := Get_Range_Ptr_Field_Value
-           (Get_Var (It_Info.Iterator_Range), Iter_Type_Info.B.Range_Right);
+         Val := M2E (Chap3.Range_To_Right (Get_Iterator_Range_Var (Iterator)));
       end if;
       Cond := New_Compare_Op (ON_Eq,
                               New_Value (Get_Var (It_Info.Iterator_Var)), Val,
@@ -563,7 +621,6 @@ package body Trans.Chap8 is
    is
       Iter_Type      : constant Iir := Get_Type (Iterator);
       Iter_Base_Type : constant Iir := Get_Base_Type (Iter_Type);
-      Iter_Type_Info : constant Ortho_Info_Acc := Get_Info (Iter_Base_Type);
       It_Info        : constant Ortho_Info_Acc := Get_Info (Iterator);
       If_Blk1        : O_If_Block;
       Deep_Rng       : Iir;
@@ -583,8 +640,7 @@ package body Trans.Chap8 is
          Start_If_Stmt
            (If_Blk1, New_Compare_Op
               (ON_Eq,
-               Get_Range_Ptr_Field_Value (Get_Var (It_Info.Iterator_Range),
-                                          Iter_Type_Info.B.Range_Dir),
+               M2E (Chap3.Range_To_Dir (Get_Iterator_Range_Var (Iterator))),
                New_Lit (Ghdl_Dir_To_Node),
                Ghdl_Bool_Type));
          Gen_Update_Iterator (It_Info.Iterator_Var,
