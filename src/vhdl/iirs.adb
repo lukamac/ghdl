@@ -2509,22 +2509,6 @@ package body Iirs is
       Set_Field4 (Target, Iir_Index32'Pos (Pos));
    end Set_Element_Position;
 
-   function Get_Base_Element_Declaration (Target : Iir) return Iir is
-   begin
-      pragma Assert (Target /= Null_Iir);
-      pragma Assert (Has_Base_Element_Declaration (Get_Kind (Target)),
-                     "no field Base_Element_Declaration");
-      return Get_Field2 (Target);
-   end Get_Base_Element_Declaration;
-
-   procedure Set_Base_Element_Declaration (Target : Iir; El : Iir) is
-   begin
-      pragma Assert (Target /= Null_Iir);
-      pragma Assert (Has_Base_Element_Declaration (Get_Kind (Target)),
-                     "no field Base_Element_Declaration");
-      Set_Field2 (Target, El);
-   end Set_Base_Element_Declaration;
-
    function Get_Selected_Element (Target : Iir) return Iir is
    begin
       pragma Assert (Target /= Null_Iir);
@@ -3197,6 +3181,22 @@ package body Iirs is
                      "no field Elements_Declaration_List");
       Set_Field1 (Decl, Iir_Flist_To_Iir (List));
    end Set_Elements_Declaration_List;
+
+   function Get_Owned_Elements_Chain (Atype : Iir) return Iir is
+   begin
+      pragma Assert (Atype /= Null_Iir);
+      pragma Assert (Has_Owned_Elements_Chain (Get_Kind (Atype)),
+                     "no field Owned_Elements_Chain");
+      return Get_Field6 (Atype);
+   end Get_Owned_Elements_Chain;
+
+   procedure Set_Owned_Elements_Chain (Atype : Iir; Chain : Iir) is
+   begin
+      pragma Assert (Atype /= Null_Iir);
+      pragma Assert (Has_Owned_Elements_Chain (Get_Kind (Atype)),
+                     "no field Owned_Elements_Chain");
+      Set_Field6 (Atype, Chain);
+   end Set_Owned_Elements_Chain;
 
    function Get_Designated_Type (Target : Iir) return Iir is
    begin
