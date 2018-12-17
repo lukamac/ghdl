@@ -909,7 +909,7 @@ package body Ghdlprint is
 
          Buf := Get_File_Source (File);
          for J in 1 .. Line loop
-            Ptr := Line_To_Position (File, J);
+            Ptr := File_Line_To_Position (File, J);
             exit when Ptr = Source_Ptr_Bad;
             exit when Buf (Ptr) = Files_Map.EOT;
 
@@ -1285,6 +1285,9 @@ package body Ghdlprint is
                raise Internal_Error;
             when Date_Parse =>
                Sem_Lib.Load_Design_Unit (Unit, Unit);
+               if Errorout.Nbr_Errors /= 0 then
+                  raise Compilation_Error;
+               end if;
             when Date_Analyze =>
                null;
          end case;

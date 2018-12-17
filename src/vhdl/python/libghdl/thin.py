@@ -25,6 +25,11 @@ def analyze_init():
 def analyze_file(filename):
     return _analyze_file(c_char_p(filename), len(filename))
 
+EOT = b'\x04'
+
+No_Source_File_Entry = 0
+
+No_Location = 0
 
 Null_Iir = 0
 Null_Iir_List = 0
@@ -81,34 +86,37 @@ class Flists:
 
 
 # Files
+class Files_Map:
+    Location_To_File = libghdl.files_map__location_to_file
 
-Location_To_File = libghdl.files_map__location_to_file
+    Location_File_To_Pos = libghdl.files_map__location_file_to_pos
 
-Location_File_To_Pos = libghdl.files_map__location_file_to_pos
+    Location_File_To_Line = libghdl.files_map__location_file_to_line
 
-Location_File_To_Line = libghdl.files_map__location_file_to_line
+    Location_File_Line_To_Offset = \
+        libghdl.files_map__location_file_line_to_offset
 
-Location_File_Line_To_Offset = libghdl.files_map__location_file_line_to_offset
+    Location_File_Line_To_Col = libghdl.files_map__location_file_line_to_col
 
-Location_File_Line_To_Col = libghdl.files_map__location_file_line_to_col
+    File_To_Location = libghdl.files_map__file_to_location
 
-Get_File_Name = libghdl.files_map__get_file_name
+    File_Pos_To_Location = libghdl.files_map__file_pos_to_location
 
-Get_File_Buffer = libghdl.files_map__get_file_buffer
-Get_File_Buffer.restype = c_void_p
+    File_Line_To_Position = libghdl.files_map__file_line_to_position
 
-Get_File_Length = libghdl.files_map__get_file_length
-Set_File_Length = libghdl.files_map__set_file_length
+    Get_File_Name = libghdl.files_map__get_file_name
 
-Read_Source_File = libghdl.files_map__read_source_file
+    Get_File_Buffer = libghdl.files_map__get_file_buffer
+    Get_File_Buffer.restype = c_void_p
 
-Reserve_Source_File = libghdl.files_map__reserve_source_file
+    Get_File_Length = libghdl.files_map__get_file_length
+    Set_File_Length = libghdl.files_map__set_file_length
 
-No_Source_File_Entry = 0
+    Read_Source_File = libghdl.files_map__read_source_file
 
-EOT = b'\x04'
+    Reserve_Source_File = libghdl.files_map__reserve_source_file
 
-No_Location = 0
+    Source_Files_Last = libghdl.files_map__source_files__last
 
 class Files_Map_Editor:
     Set_Gap = libghdl.files_map__editor__set_gap
@@ -154,6 +162,11 @@ class Ieee:
 # Flags
 class Flags:
     Flag_Elocations = c_bool.in_dll(libghdl, "flags__flag_elocations")
+
+    Verbose = c_bool.in_dll(libghdl, "flags__verbose")
+
+    Flag_Elaborate_With_Outdated = c_bool.in_dll(
+        libghdl, "flags__flag_elaborate_with_outdated")
 
 
 # Scanner
