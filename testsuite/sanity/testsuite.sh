@@ -10,13 +10,19 @@ failures=""
 full=n
 
 for opt; do
-  case "$opt" in
-  -k | --keep-going)  full=y ;;
-  --list-tests) echo $dirs; exit 0;;
-  *) echo "Unknown option $opt"
-     exit 2
-     ;;
-  esac
+	case "$opt" in
+	-k | --keep-going)
+		full=y
+		;;
+	--list-tests)
+		echo $dirs
+		exit 0
+		;;
+	*)
+		echo "Unknown option $opt"
+		exit 2
+		;;
+	esac
 done
 
 singlerun() {
@@ -36,7 +42,9 @@ singlerun() {
   cd ..
 }
 
-for i in $dirs; do singlerun $i $full; done
+for i in $dirs; do
+	singlerun $i $full
+done
 
 if [ x"$failures" = x"" ]; then
     echo "sanity tests are successful" && exit 0

@@ -30,75 +30,76 @@ ANSI_GREEN="\033[32m"
 if [ -z "$ENABLECOLOR" ]; then unset ANSI_NOCOLOR ANSI_RED ANSI_BLUE ANSI_GREEN; fi
 
 if [ x"$GHDL" = x ]; then
-    echo "error: GHDL environment variable is not defined"
-    exit 4
+	echo "error: GHDL environment variable is not defined"
+	exit 4
 fi
 
 # Analyze files (no error expected)
 analyze ()
 {
-   echo "analyze $@"
-   "$GHDL" -a $GHDL_STD_FLAGS $GHDL_FLAGS $@
+	echo "analyze $@"
+	"$GHDL" -a $GHDL_STD_FLAGS $GHDL_FLAGS $@
 }
 
 # Analyze files (failure expected)
 analyze_failure ()
 {
-   echo "try to analyze $@"
-   # for arg in $@; do echo "arg: $arg"; done
-   if ! "$GHDL" -a --expect-failure $GHDL_STD_FLAGS $GHDL_FLAGS $@ ; then
-     echo "Failure expected"
-     return 1
-   fi
+	echo "try to analyze $@"
+	# for arg in $@; do echo "arg: $arg"; done
+	if ! "$GHDL" -a --expect-failure $GHDL_STD_FLAGS $GHDL_FLAGS $@ ; then
+		echo "Failure expected"
+		return 1
+	fi
 }
 
 # Elaborate a design (no error expected)
 # Note: somewhat deprecated, use elab_simulate instead.
 elab ()
 {
-   echo "elaborate $@"
-   "$GHDL" -e $GHDL_STD_FLAGS $GHDL_FLAGS $GHDL_ELABFLAGS $@
+	echo "elaborate $@"
+	"$GHDL" -e $GHDL_STD_FLAGS $GHDL_FLAGS $GHDL_ELABFLAGS $@
 }
 
 # Elaborate a design (failure expected)
 # Note: somewhat deprecated, use elab_simulate_failure instead.
 elab_failure ()
 {
-   echo "elaborate (failure expected) $@"
-   "$GHDL" -e --expect-failure $GHDL_STD_FLAGS $GHDL_FLAGS $GHDL_ELABFLAGS $@
+	echo "elaborate (failure expected) $@"
+	"$GHDL" -e --expect-failure $GHDL_STD_FLAGS $GHDL_FLAGS $GHDL_ELABFLAGS $@
 }
 
 # Simulate a design (no error expected)
 # Note: somewhat deprecated, use elab_simulate instead.
 simulate ()
 {
-   echo "simulate $@ ($GHDL_FLAGS $@ $GHDL_SIMFLAGS)" >&2
-   "$GHDL" -r $GHDL_STD_FLAGS $GHDL_FLAGS "$@" $GHDL_SIMFLAGS
-   #./$@
+	echo "simulate $@ ($GHDL_FLAGS $@ $GHDL_SIMFLAGS)" >&2
+	"$GHDL" -r $GHDL_STD_FLAGS $GHDL_FLAGS "$@" $GHDL_SIMFLAGS
+	#./$@
 }
 
 # Simulate a design (failure expected)
 # Note: somewhat deprecated, use elab_simulate_failure instead.
 simulate_failure ()
 {
-   echo "simulate (failure expected) $@" >&2
-   "$GHDL" -r $GHDL_STD_FLAGS $GHDL_FLAGS $@ --expect-failure
-   #./$@
+	echo "simulate (failure expected) $@" >&2
+	"$GHDL" -r $GHDL_STD_FLAGS $GHDL_FLAGS $@ --expect-failure
+	#./$@
 }
 
 # Elaborate and simulate a design (no error expected)
 elab_simulate ()
 {
-   echo "elaborate and simulate $@"
-   "$GHDL" --elab-run $GHDL_STD_FLAGS $GHDL_FLAGS $GHDL_ELABFLAGS $@
+	echo "elaborate and simulate $@"
+	echo "$GHDL --elab-run $GHDL_STD_FLAGS $GHDL_FLAGS $GHDL_ELABFLAGS $@"
+	"$GHDL" --elab-run $GHDL_STD_FLAGS $GHDL_FLAGS $GHDL_ELABFLAGS $@
 }
 
 # Elaborate and simulate a design (failure expected)
 elab_simulate_failure ()
 {
-   echo "elaborate and simulate (failure expected) $@"
-   "$GHDL" --elab-run $GHDL_STD_FLAGS $GHDL_FLAGS $GHDL_ELABFLAGS \
-     $@ --expect-failure
+	echo "elaborate and simulate (failure expected) $@"
+	"$GHDL" --elab-run $GHDL_STD_FLAGS $GHDL_FLAGS $GHDL_ELABFLAGS \
+	$@ --expect-failure
 }
 
 # Check if a feature is present
@@ -109,40 +110,42 @@ ghdl_has_feature ()
 
 ghdl_is_interpretation ()
 {
-  "$GHDL" --version | grep -q interpretation
+	"$GHDL" --version | grep -q interpretation
 }
 
 # Run a program
 run ()
 {
-   echo "run $@"
-   eval $@
+	echo "run $@"
+	eval $@
 }
 
 # Run a program (failure expected)
 run_failure ()
 {
-   echo "run (failure expected) $@"
-   if eval $@; then
-     echo "failure expected";
-     false;
-   fi
+	echo "run (failure expected) $@"
+	if eval $@; then
+		echo "failure expected"
+		return 1
+	fi
 }
 
 # Clean the environment
 clean ()
 {
-  if [ $# -eq 0 ]; then
-    echo "Remove work library"
-    "$GHDL" --remove $GHDL_STD_FLAGS
-  else
-    case "$1" in
-      --std=*)
-    	echo "Remove work library"
-    	"$GHDL" --remove $1 ;;
-      *)
-	echo "Remove $1 library"
-    	"$GHDL" --remove $GHDL_STD_FLAGS --work=$1 ;;
-    esac
-  fi
+	if [ $# -eq 0 ]; then
+		echo "Remove work library"
+		"$GHDL" --remove $GHDL_STD_FLAGS
+	else
+		case "$1" in
+			--std=*)
+				echo "Remove work library"
+				"$GHDL" --remove $1
+				;;
+			*)
+				echo "Remove $1 library"
+				"$GHDL" --remove $GHDL_STD_FLAGS --work=$1
+				;;
+		esac
+	fi
 }
