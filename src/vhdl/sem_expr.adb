@@ -2291,6 +2291,8 @@ package body Sem_Expr is
             Error_Msg_Sem (+Sel, "array type must be locally static");
             return;
          end if;
+         --  Use the base type so that the subtype of the choices is computed.
+         Sel_Type := Get_Base_Type (Sel_Type);
       end if;
       Sel_El_Type := Get_Element_Subtype (Sel_Type);
       Sel_El_Length := Eval_Discrete_Type_Length (Sel_El_Type);
@@ -3394,10 +3396,14 @@ package body Sem_Expr is
 
             --  GHDL: must be checked for all associations, so do it outside
             --  the above 'if' statement.
+            --  GHDL: improve error message.
             case Get_Kind (El) is
                when Iir_Kind_Choice_By_None
                  | Iir_Kind_Choice_By_Range =>
                   null;
+               when Iir_Kind_Choice_By_Others =>
+                  Error_Msg_Sem
+                    (+El, "expression for 'others' must be an element");
                when others =>
                   Error_Msg_Sem
                     (+El, "positional association or "
