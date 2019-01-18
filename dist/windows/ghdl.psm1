@@ -89,11 +89,16 @@ function Get-GHDLBinary
 	)
 
 	if ($GHDL -ne "")
-	{	$GHDLBinary = $GHDL.TrimEnd("\")			+ "\ghdl.exe"	}
+	{	$GHDLBinary = $GHDL       }
 	elseif (Test-Path env:GHDL)
-	{	$GHDLBinary = $env:GHDL.TrimEnd("\")	+ "\ghdl.exe"	}
+	{	$GHDLBinary = $env:GHDL   }
 	else
-	{	$GHDLBinary = "ghdl.exe"														}
+	{	try
+		{	write-host "calling which ..."
+			$GHDLBinary = (Get-Command "ghdl.exe").Source }
+		catch
+		{	throw "Use adv. options '-GHDL' to set the GHDL executable."  }
+	}
 	
 	if (-not (Test-Path $GHDLBinary -PathType Leaf))
 	{	throw "Use adv. options '-GHDL' to set the GHDL executable."  }

@@ -14,7 +14,8 @@
 #		- extract the ZIP file's content to a destination directory
 #
 # ==============================================================================
-#	Copyright (C) 2015-2017 Patrick Lehmann
+# Copyright (C) 2017-2019 Patrick Lehmann - Boetzingen, Germany
+# Copyright (C) 2015-2016 Patrick Lehmann - Dresden, Germany
 #	
 #	GHDL is free software; you can redistribute it and/or modify it under
 #	the terms of the GNU General Public License as published by the Free
@@ -56,7 +57,7 @@ Param(
 	# register GHDL in PATH
 	[Parameter(Mandatory=$false)]
 	[ValidateSet("Machine", "User", "Session", "Remove", "Pass")]
-	[String]$AddToPath = "",
+	[String]$AddToPath = "Pass",
 	
 	# display this help"
 	[switch]$Help

@@ -163,8 +163,7 @@ function Get-GHDLBinary
 	{	$GHDLBinary = $env:GHDL   }
 	else
 	{	try
-		{	write-host "calling which ..."
-			$GHDLBinary = (Get-Command "ghdl.exe").Source }
+		{	$GHDLBinary = (Get-Command "ghdl.exe").Source }
 		catch
 		{	Write-Host "Use adv. options '-GHDL' to set the GHDL executable." -ForegroundColor Red
 			Exit-CompileScript -1

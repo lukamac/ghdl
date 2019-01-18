@@ -167,6 +167,8 @@ $GHDLOptions = @(
 	"-Wbinding",
 	"-Wno-hide",
 	"-Wno-others",
+	"-Wno-pure",
+	"-Wno-library",
 	"--ieee=$VHDLFlavor",
 	"--no-vital-checks",
 	"--std=$VHDLStandard",

@@ -145,7 +145,21 @@ if ($VHDL2008)
 $VHDLVersion,$VHDLStandard,$VHDLFlavor = Get-VHDLVariables $VHDL93 $VHDL2008
 
 # define global GHDL Options
-$GHDLOptions = @("-a", "-fexplicit", "-frelaxed-rules", "--mb-comments", "--warn-binding", "--ieee=$VHDLFlavor", "--no-vital-checks", "--std=$VHDLStandard", "-P$DestinationDirectory")
+$GHDLOptions = @(
+	"-a",
+	"-fexplicit",
+	"-frelaxed-rules",
+	"--mb-comments",
+	"-Wbinding",
+	"-Wno-hide",
+	"-Wno-others",
+	"-Wno-pure",
+	"-Wno-library",
+	"--ieee=$VHDLFlavor",
+	"--no-vital-checks",
+	"--std=$VHDLStandard",
+	"-P$DestinationDirectory"
+)
 
 # extract data from configuration
 # $SourceDir =      $InstallationDirectory["AlteraQuartus"] + "\quartus\eda\sim_lib"
