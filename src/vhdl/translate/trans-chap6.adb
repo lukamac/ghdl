@@ -532,6 +532,7 @@ package body Trans.Chap6 is
       Slice_Range  : Mnode;
       Prefix_Range : Mnode;
 
+      Diff_Type       : O_Tnode;
       Diff            : O_Dnode;
       Unsigned_Diff   : O_Dnode;
       If_Blk, If_Blk1 : O_If_Block;
@@ -553,17 +554,15 @@ package body Trans.Chap6 is
 
          --  Both prefix and result are constrained array.
          declare
+            Index_Range : constant Iir := Get_Range_Constraint (Index_Type);
+            Slice_Index_Type : constant Iir := Get_Index_Type (Slice_Type, 0);
+            Slice_Range : constant Iir :=
+              Get_Range_Constraint (Slice_Index_Type);
             Prefix_Left, Slice_Left : Iir_Int64;
             Off                     : Iir_Int64;
-            Slice_Index_Type        : Iir;
-            Slice_Range             : Iir;
             Slice_Length            : Iir_Int64;
-            Index_Range             : Iir;
          begin
-            Index_Range := Get_Range_Constraint (Index_Type);
             Prefix_Left := Eval_Pos (Get_Left_Limit (Index_Range));
-            Slice_Index_Type := Get_Index_Type (Slice_Type, 0);
-            Slice_Range := Get_Range_Constraint (Slice_Index_Type);
             Slice_Left := Eval_Pos (Get_Left_Limit (Slice_Range));
             Slice_Length := Eval_Discrete_Range_Length (Slice_Range);
             if Slice_Length = 0 then
@@ -646,7 +645,20 @@ package body Trans.Chap6 is
                                  Ghdl_Bool_Type));
       New_Assign_Stmt (New_Obj (Unsigned_Diff), New_Lit (Ghdl_Index_0));
       New_Else_Stmt (If_Blk);
-      Diff := Create_Temp (Index_Info.Ortho_Type (Mode_Value));
+
+      --  Use a signed intermediate type to do the substraction.  This is
+      --  required for enum types.
+      case Type_Mode_Discrete (Index_Info.Type_Mode) is
+         when Type_Mode_B1
+           | Type_Mode_E8
+           | Type_Mode_E32
+           | Type_Mode_I32 =>
+            Diff_Type := Ghdl_I32_Type;
+         when Type_Mode_I64 =>
+            Diff_Type := Ghdl_I64_Type;
+      end case;
+
+      Diff := Create_Temp (Diff_Type);
 
       --  Compute the offset in the prefix.
       if not Static_Range then
@@ -660,9 +672,12 @@ package body Trans.Chap6 is
          --  Diff = slice - bounds.
          New_Assign_Stmt
            (New_Obj (Diff),
-            New_Dyadic_Op (ON_Sub_Ov,
-                           M2E (Chap3.Range_To_Left (Slice_Range)),
-                           M2E (Chap3.Range_To_Left (Prefix_Range))));
+            New_Dyadic_Op
+              (ON_Sub_Ov,
+               New_Convert_Ov (M2E (Chap3.Range_To_Left (Slice_Range)),
+                               Diff_Type),
+               New_Convert_Ov (M2E (Chap3.Range_To_Left (Prefix_Range)),
+                               Diff_Type)));
       end if;
       if not Static_Range then
          New_Else_Stmt (If_Blk1);
@@ -672,9 +687,12 @@ package body Trans.Chap6 is
          --  Diff = bounds - slice.
          New_Assign_Stmt
            (New_Obj (Diff),
-            New_Dyadic_Op (ON_Sub_Ov,
-                           M2E (Chap3.Range_To_Left (Prefix_Range)),
-                           M2E (Chap3.Range_To_Left (Slice_Range))));
+            New_Dyadic_Op
+              (ON_Sub_Ov,
+               New_Convert_Ov (M2E (Chap3.Range_To_Left (Prefix_Range)),
+                               Diff_Type),
+               New_Convert_Ov (M2E (Chap3.Range_To_Left (Slice_Range)),
+                               Diff_Type)));
       end if;
       if not Static_Range then
          Finish_If_Stmt (If_Blk1);
@@ -694,8 +712,7 @@ package body Trans.Chap6 is
          Err_1 := New_Compare_Op
            (ON_Lt,
             New_Obj_Value (Diff),
-            New_Lit (New_Signed_Literal (Index_Info.Ortho_Type (Mode_Value),
-                                         0)),
+            New_Lit (New_Signed_Literal (Diff_Type, 0)),
             Ghdl_Bool_Type);
          --  Bounds error if right of slice is after right of prefix.
          Err_2 := New_Compare_Op

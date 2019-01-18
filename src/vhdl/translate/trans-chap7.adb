@@ -900,6 +900,7 @@ package body Trans.Chap7 is
    is
       Ainfo : Type_Info_Acc;
       Einfo : Type_Info_Acc;
+      Mode : Object_Kind_Type;
    begin
       pragma Assert
         (Get_Kind (Expr_Type) in Iir_Kinds_Array_Type_Definition);
@@ -933,7 +934,13 @@ package body Trans.Chap7 is
                   --  the code is not required to run.
                   Chap6.Gen_Bound_Error (Loc);
                end if;
-               return Expr;
+               --  Convert.  For subtypes of arrays with unbounded elements,
+               --  the subtype can be the same but the ortho type can be
+               --  different.
+               Mode := Get_Object_Kind (Expr);
+               return E2M (New_Convert_Ov (M2Addr (Expr),
+                                           Ainfo.Ortho_Ptr_Type (Mode)),
+                           Ainfo, Mode);
             else
                --  Unbounded/bounded array to bounded array.
                return Convert_To_Constrained (Expr, Expr_Type, Res_Type, Loc);
@@ -3483,7 +3490,7 @@ package body Trans.Chap7 is
       Var_Index := Create_Temp_Init
         (Ghdl_Index_Type, New_Lit (Ghdl_Index_0));
       Translate_Array_Aggregate_Gen
-        (Base, Bounds, Aggr, Aggr_Type, 1, Var_Index);
+        (Base, Bounds, Aggr, Target_Type, 1, Var_Index);
       Close_Temp;
 
       --  FIXME: creating aggregate subtype is expensive and rarely used.
@@ -3492,20 +3499,21 @@ package body Trans.Chap7 is
    end Translate_Array_Aggregate;
 
    procedure Translate_Aggregate
-     (Target : Mnode; Target_Type : Iir; Aggr : Iir)
-   is
-      Aggr_Type : constant Iir := Get_Type (Aggr);
-      El        : Iir;
+     (Target : Mnode; Target_Type : Iir; Aggr : Iir) is
    begin
-      case Iir_Kinds_Composite_Type_Definition (Get_Kind (Aggr_Type)) is
+      case Iir_Kinds_Composite_Type_Definition (Get_Kind (Target_Type)) is
          when Iir_Kind_Array_Subtype_Definition
-            | Iir_Kind_Array_Type_Definition =>
-            El := Is_Aggregate_Others (Aggr);
-            if El /= Null_Iir then
-               Translate_Aggregate_Others (Target, Target_Type, El);
-            else
-               Translate_Array_Aggregate (Target, Target_Type, Aggr);
-            end if;
+           | Iir_Kind_Array_Type_Definition =>
+            declare
+               El : Iir;
+            begin
+               El := Is_Aggregate_Others (Aggr);
+               if El /= Null_Iir then
+                  Translate_Aggregate_Others (Target, Target_Type, El);
+               else
+                  Translate_Array_Aggregate (Target, Target_Type, Aggr);
+               end if;
+            end;
          when Iir_Kind_Record_Type_Definition
             | Iir_Kind_Record_Subtype_Definition =>
             Translate_Record_Aggregate (Target, Aggr);
